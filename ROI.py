@@ -153,12 +153,9 @@ class ROI:
     def remove(self):
         """Take ROI polygon/lines off the image."""
         for l in self.lines:
-            try:
-                l.remove()
-            except:pass
-        try:
-            self.patch.remove()
-        except: pass            
+            l.remove()
+            self.patch.remove()  
+            
         self.lines = []
         self.line = None
         self.patch = None

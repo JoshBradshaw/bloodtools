@@ -68,8 +68,7 @@ def load_ROIs(filename):
     return roi_list
 
 def read_dicoms(foldername, attributes=[]):
-    """Read in all the dicom files in a folder and any necessary attributes"""
-    print foldername   
+    """Read in all the dicom files in a folder and any necessary attributes"""   
     
     file_list=os.listdir(foldername)
     file_list.sort()
@@ -79,7 +78,7 @@ def read_dicoms(foldername, attributes=[]):
     for file in file_list:
         attribute_dict={}
         try:
-            image=dicom.read_file(foldername + '/' + file)
+            image=dicom.read_file(os.path.join(foldername, file))
             image_list.append(image.pixel_array)
 #            attribute_list.append([getattr(image,item,0) for item in attributes])
             if attributes:            
@@ -88,9 +87,7 @@ def read_dicoms(foldername, attributes=[]):
                 attribute_list.append(attribute_dict)
             
         except dicom.filereader.InvalidDicomError:
-            continue
-        
-        except IOError:
+            print "Error, invalid dicom file: {}".format(os.path.join(foldername, file))            
             continue
    
     return image_list, attribute_list       

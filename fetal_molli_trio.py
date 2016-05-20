@@ -10,11 +10,11 @@ import blood_tools
 import os
 import pylab as plt
 from uncertainties import ufloat
-from misc import fitting
+import fitting
 
 parent_folder= os.getcwd()
 
-scans_to_process=['/3T_data/10mar2016_trio/se_mc_comp_full_spoil 48ms ETL8_68']
+scans_to_process=['/../3T_data/10mar2016_trio/se_mc_comp_full_spoil 48ms ETL8_68']
 
 
 #scans_to_process=['27feb2016_trio/T1map_TRUFI_40DEG_74',

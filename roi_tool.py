@@ -18,9 +18,9 @@ import blood_tools
 class PlotWidget(QtGui.QWidget):
     def __init__(self, parent=None):
         super(PlotWidget, self).__init__(parent)
-
+        self.r = None
         self.figure = Figure()
-        self.axes = self.figure.add_subplot(111)
+        self.axes = self.figure.add_subplot(111, autoscale_on=True)
         self.canvas = FigureCanvas(self.figure)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
 
@@ -29,33 +29,30 @@ class PlotWidget(QtGui.QWidget):
         layout.addWidget(self.canvas)
         layout.addWidget(self.toolbar)
         self.setLayout(layout)
-        self.make_image(np.ones((10, 10)))
-        self.r = None
+        #self.make_image(np.zeros((10, 10)))
+        
         
     def make_image(self, im):
         self.clear_roi()
         self.axes.clear()
-#        self.im = self.axes.imshow(im, vmin=np.percentile(im, 5),
-#                                   vmax=np.percentile(im, 95), cmap='gray')
-        self.im = self.axes.imshow(im)#, vmin=np.percentile(im, 5),
-                                 # vmax=np.percentile(im, 95), cmap='gray')
+        print im
+        self.im = self.axes.imshow(im, vmin=np.percentile(im, 5),
+                                    vmax=np.percentile(im, 95), cmap='gray')
+        #self.im = self.axes.imshow(im)
 
     def new_roi(self):
         self.r = ROI.new_ROI(self.im)
 
     def clear_roi(self):
-        try:
+        if self.r is not None: # check if there is an ROI
             self.r.patch.remove()
             self.r.disconnect()
             self.axes.lines.clear()
-        except:
-            pass
+
     
     def get_roi(self):
-        try:
-            return self.r.get_mask()
-        except:
-            pass
+        return self.r.get_mask()
+
 
 class MainWindow(QtGui.QWidget):
     def __init__(self):
@@ -94,13 +91,14 @@ class MainWindow(QtGui.QWidget):
     
     def choose_dir(self):
         out = QtGui.QFileDialog.getExistingDirectory(caption='MRI Data Directory')
-        print out
         
         if out:
             self.directory = out
             #image = make_image_from_directory(out)
-            image=blood_tools.read_dicoms(out,[])[0]
+            image=blood_tools.read_dicoms(out,[])[0][0]
             self.plot_im.make_image(image)
+        else:
+            pass
     
     def start_roi(self, state):
         if state:
