@@ -64,15 +64,16 @@ class ROI:
                                    [self.previous_point[1], y])      
                 self.fig.canvas.draw()
             elif event.button == 1: # Free Hand Drawing
-                line = plt.Line2D([self.previous_point[0], x],
-                              [self.previous_point[1], y])                  
+                    line = plt.Line2D([self.previous_point[0], x],
+                                  [self.previous_point[1], y])                  
   
-                ax.add_line(line)
-                self.lines.append(line)
-                self.previous_point = [x, y]
-                self.fig.canvas.draw()
-                self.xcoords.append(x)
-                self.ycoords.append(y)
+                    ax.add_line(line)
+                    self.lines.append(line)
+                    self.previous_point = [x, y]
+                    self.fig.canvas.draw()
+                    self.xcoords.append(x)
+                    self.ycoords.append(y)
+
         
     def button_press_callback(self, event):
         """Left button: add point; middle button: delete point;

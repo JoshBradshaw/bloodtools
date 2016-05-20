@@ -69,6 +69,8 @@ def load_ROIs(filename):
 
 def read_dicoms(foldername, attributes=[]):
     """Read in all the dicom files in a folder and any necessary attributes"""
+    print foldername   
+    
     file_list=os.listdir(foldername)
     file_list.sort()
     image_list=[]
@@ -90,7 +92,7 @@ def read_dicoms(foldername, attributes=[]):
         
         except IOError:
             continue
-    print attribute_list
+   
     return image_list, attribute_list       
 
 def img_roi_signal(folders_to_process,attributes=[]):
@@ -104,6 +106,7 @@ def img_roi_signal(folders_to_process,attributes=[]):
     roi_list=[]
     attribute_lists=[]
     max_images=0
+    
 
     for ii,folder in enumerate(folders_to_process):
         image_list,attribute_list=read_dicoms(folder,attributes)
@@ -120,6 +123,7 @@ def img_roi_signal(folders_to_process,attributes=[]):
         roi_list.append(rois)
         max_images=np.max([max_images,len(image_list)])
         
+    
     mean_signal_mat=np.zeros([len(folders_to_process),len(rois),max_images])
     serr_signal_mat=np.zeros([len(folders_to_process),len(rois),max_images])
     
@@ -163,8 +167,10 @@ def SE_fit_new(te, signal, mean_noise=0, noise_floor='n', noise_factor=2):
 #        spin_echo['a'].freeze()        
         spin_echo.fit(te,signal) 
         #ci=spin_echo.conf(sigma=1) 
+    
     return spin_echo
 
+    
 def T2_cpmg_process(folder_to_process,plot='y'):
     """Given a folder of images will process cpmg data and return
     fitted T2 values and associated uncertainties"""

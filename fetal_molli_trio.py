@@ -10,12 +10,12 @@ import blood_tools
 import os
 import pylab as plt
 from uncertainties import ufloat
-import fitting
-from misc import ROI
+from misc import fitting
 
-parent_folder=os.getcwd()
+parent_folder= os.getcwd()
 
-scans_to_process=['3T_data/10mar2016_trio/se_mc_comp_full_spoil 18ms_64']
+scans_to_process=['/3T_data/10mar2016_trio/se_mc_comp_full_spoil 48ms ETL8_68']
+
 
 #scans_to_process=['27feb2016_trio/T1map_TRUFI_40DEG_74',
 #                  '10mar2016_trio/T1map_TRUFI_40DEG shorter_69',
@@ -30,11 +30,11 @@ TI_full=np.arange(0,20000,1)
 T1_dictionary={}
 for jj, scan in enumerate(scans_to_process): 
     plt.figure()
-    folder = os.path.join(parent_folder, scan)
+    folder = parent_folder + scan
     images,TI=blood_tools.read_dicoms(folder,['InversionTime'])
     ti=np.array([element['InversionTime'] for element in TI])        
     
-    rois=blood_tools.load_ROIs( os.path.join(folder, 'rois') )
+    rois=blood_tools.load_ROIs(folder + '/rois')
     bga_data=blood_tools.read_bga(os.path.split(folder)[0]+'/sO2_Hct')  
     sO2s=bga_data[0]
     ctHbs=bga_data[1]
@@ -60,7 +60,8 @@ for jj, scan in enumerate(scans_to_process):
         plt.subplot(4,4,mm+1)
         plt.plot(ti, sig,'o')
         plt.plot(TI_full,inversion_recovery(TI_full))          
-        T1_corr=inversion_recovery['T1'].value*(2*inversion_recovery['aa'].value-1)
+        T1_corr=inversion_recovery['T1'].value*(2*inversion_recovery['aa'].value-1)  
+        
 
         T1_full=ufloat(T1_corr,10)
         
@@ -90,6 +91,7 @@ for key in T1_dictionary:
 
 import matplotlib
 plt.scatter(Hcts, T1s, c=sO2s, s=125, vmin=0,vmax=1.0, marker='h',edgecolor='black',cmap=matplotlib.cm.cool) 
+
 
 
 #Check chi-square surface
