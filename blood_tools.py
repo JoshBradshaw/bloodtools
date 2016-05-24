@@ -75,10 +75,10 @@ def read_dicoms(foldername, attributes=[]):
     image_list=[]
     attribute_list=[]
 
-    for file in file_list:
+    for file_name in file_list:
         attribute_dict={}
         try:
-            image=dicom.read_file(os.path.join(foldername, file))
+            image=dicom.read_file(os.path.join(foldername, file_name))
             image_list.append(image.pixel_array)
 #            attribute_list.append([getattr(image,item,0) for item in attributes])
             if attributes:            

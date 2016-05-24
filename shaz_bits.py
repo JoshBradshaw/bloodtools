@@ -82,9 +82,11 @@ class display_many:
         self.data = args
         self.im = []
         self.ax = []
+        
         for i in range(len(self.data)):
             self.ax.append(fig.add_subplot(self.row,self.col,i+1))
             self.im.append(self.ax[-1].imshow(self.data[i][0],origin='upper',cmap=cmap,aspect='equal'))
+            
         self.cmap=cmap
         axcolor = 'lightgoldenrodyellow'
         self.sliceax = fig.add_axes([0.25, 0.15, 0.65, 0.03], axisbg=axcolor)
@@ -102,24 +104,16 @@ class display_many:
         self.fig.canvas.draw()
         self.points = {}
         
-        self.prev_next_callback = Index()
         # defines the positions of the previous/next slice buttons
         axprev = plt.axes([0.81, 0.9, 0.1, 0.075])
         axnext = plt.axes([0.81, 0.8, 0.1, 0.075])
         self.bprev = Button(axprev, 'Previous')
         self.bnext = Button(axnext, 'Next')
         # previous/next slice select buttons
-        bprev.on_clicked(self.next)
-        bnext.on_clicked(self.prev)
+        self.bprev.on_clicked(self.next_image)
+        self.bnext.on_clicked(self.prev_image)
         pprint(self.data[0][0])
         
-    def set_points(self,N,z,y,x,mark='r+'):
-        p = self.points.get(N,np.array([[],[],[]]))
-        self.points[N] = [np.append(p[i],[z,y,x][i]) for i in [0,1,2]]
-        ax = self.ax[N].axis()
-        self.ax[N].points = self.ax[N].plot([],[],mark)[0]
-        self.ax[N].axis(ax)
-
     def update(self,val):
         if self.vmin.val<self.vmax.val:
             vmin,vmax = self.vmin.val,self.vmax.val
@@ -130,29 +124,37 @@ class display_many:
         for i in range(self.num):
             z = np.argmin((self.zs[i] - self.sli_wid.val)**2)
             im = self.data[i][z]
-            if self.points.has_key(i):
-                zs = self.points[i][0]
-                ind = (zs>z-0.5)*(zs<z+0.5)
-                self.ax[i].points.set_xdata(self.points[i][2][ind])
-                self.ax[i].points.set_ydata(self.points[i][1][ind])
+            print "self.data acessed - i: {} z: {}".format(i, z)
+
             self.im[i].set_data(im)
             self.im[i].set_cmap(cm)
             self.im[i].set_clim(im.min()+(im.max()-im.min())*vmin/100.,im.min()+(im.max()-im.min())*vmax/100.)
         self.fig.canvas.draw()
         
-    def next(self, event):
-        image_index += 1
-        i = self.ind % len(freqs)
-        ydata = np.sin(2*np.pi*freqs[i]*t)
-        l.set_ydata(ydata)
-        plt.draw()
+    def next_image(self, event):
+        ind = self.image_index + 1
+        self.image_index = ind % len(self.data[0])
+        self.set_image(self.image_index)
 
-    def prev(self, event):
-        image_index -= 1
-        i = self.ind % len(freqs)
-        ydata = np.sin(2*np.pi*freqs[i]*t)
-        l.set_ydata(ydata)
-        plt.draw()    
+    def prev_image(self, event):
+        ind = self.image_index - 1
+        self.image_index = ind % len(self.data[0])
+        self.set_image(self.image_index)
+        
+    def set_image(self, image_index):
+        if self.vmin.val<self.vmax.val:
+            vmin,vmax = self.vmin.val,self.vmax.val
+            cm = self.cmap
+            
+        if self.vmin.val>self.vmax.val:
+            vmax,vmin = self.vmin.val,self.vmax.val
+            cm = self.cmap+'_r'        
+        
+        im = self.data[0][image_index]
+        self.im[0].set_data(im)
+        self.im[0].set_cmap(cm)
+        self.im[0].set_clim(im.min()+(im.max()-im.min())*vmin/100.,im.min()+(im.max()-im.min())*vmax/100.)   
+        self.fig.canvas.draw()
     
     def key(self,event):
         if event.button != 2:
