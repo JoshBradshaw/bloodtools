@@ -2,9 +2,10 @@
 import numpy as np
 import os,sys
 import pylab as plt
+from pprint import pprint
 
 cmap = 'gray'
-from matplotlib.widgets import Slider
+from matplotlib.widgets import Slider, Button
 
 def write_minc(volume, vox_size, filename):
     """Write out a data volume in minimal MINC format, using h5py."""
@@ -47,12 +48,12 @@ def read_minc(filename):
     v = out['minc-2.0']['image']['0']['image'].value
     z = [out['minc-2.0']['dimensions'][s].attrs['step'] for s in ['zspace','yspace','xspace']]
     return v.astype('float32'),z
+    
 
 class display_many:
     """As display, above, but instead of selecting between data-sets, show them
     side-by side, and provide a graphical cursor. Note that selecting time-point
     of -1 shows time1-time0 subtracted image."""
-    plots = [[1,1],[1,2],[2,2],[2,2],[2,3],[2,3],[2,4],[2,4],[3,3]]
     def __init__(self,*arg,**kwargs):
         """Optional parameters:
         - fig: the matplotlib figure to use ("current" if left blank)
@@ -64,13 +65,18 @@ class display_many:
         fig.clf()
         self.text = fig.text(0,.99,"",va='top')
         self.num = len(arg)
-        self.row,self.col = self.plots[self.num-1]
+        self.row,self.col = [1,1]
         fig.subplots_adjust(left=0.05, bottom=0.25,top=0.95,right=0.95,wspace=0.1,hspace=0.15)
         args = []
         self.zs = []
+        
+        self.image_index = 0
+        
+        # initialize using an array of images
         for a in arg:
             args.append(a)
             self.zs.append(np.arange(len(a)))
+        
         maxz = max([max(z) for z in self.zs])
         minz = min([min(z) for z in self.zs])
         self.data = args
@@ -95,7 +101,18 @@ class display_many:
         self.fig.canvas.mpl_connect('button_press_event',self.key)
         self.fig.canvas.draw()
         self.points = {}
-
+        
+        self.prev_next_callback = Index()
+        # defines the positions of the previous/next slice buttons
+        axprev = plt.axes([0.81, 0.9, 0.1, 0.075])
+        axnext = plt.axes([0.81, 0.8, 0.1, 0.075])
+        self.bprev = Button(axprev, 'Previous')
+        self.bnext = Button(axnext, 'Next')
+        # previous/next slice select buttons
+        bprev.on_clicked(self.next)
+        bnext.on_clicked(self.prev)
+        pprint(self.data[0][0])
+        
     def set_points(self,N,z,y,x,mark='r+'):
         p = self.points.get(N,np.array([[],[],[]]))
         self.points[N] = [np.append(p[i],[z,y,x][i]) for i in [0,1,2]]
@@ -122,7 +139,21 @@ class display_many:
             self.im[i].set_cmap(cm)
             self.im[i].set_clim(im.min()+(im.max()-im.min())*vmin/100.,im.min()+(im.max()-im.min())*vmax/100.)
         self.fig.canvas.draw()
+        
+    def next(self, event):
+        image_index += 1
+        i = self.ind % len(freqs)
+        ydata = np.sin(2*np.pi*freqs[i]*t)
+        l.set_ydata(ydata)
+        plt.draw()
 
+    def prev(self, event):
+        image_index -= 1
+        i = self.ind % len(freqs)
+        ydata = np.sin(2*np.pi*freqs[i]*t)
+        l.set_ydata(ydata)
+        plt.draw()    
+    
     def key(self,event):
         if event.button != 2:
             return
