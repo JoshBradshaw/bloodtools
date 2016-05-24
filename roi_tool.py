@@ -95,8 +95,8 @@ class MainWindow(QtGui.QWidget):
         if out:
             self.directory = out
             #image = make_image_from_directory(out)
-            image=blood_tools.read_dicoms(out,[])[0][0]
-            self.plot_im.make_image(image)
+            images, attributes = blood_tools.read_dicoms(out,[])
+            self.plot_im.make_image(images[0])
         else:
             pass
     

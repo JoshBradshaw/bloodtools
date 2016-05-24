@@ -2,6 +2,7 @@
 import numpy as np
 import os,sys
 import pylab as plt
+
 cmap = 'gray'
 from matplotlib.widgets import Slider
 
@@ -159,3 +160,24 @@ class XYMultiCursor:
             line.set_ydata((event.ydata, event.ydata))
             line.set_visible(self.visible)
         self.canvas.draw()
+
+def test_display_many():
+    import blood_tools
+    scans_to_process=['/../3T_data/23apr2016_trio/3D SE blood 2_24']
+
+    #scans_to_process=['27feb2016_trio/T1map_TRUFI_40DEG_74',
+    #                  '10mar2016_trio/T1map_TRUFI_40DEG shorter_69',
+    #                  '30mar2016_trio/T1map_TRUFI_40DEG shorter_78',
+    #                  '23apr2016_trio/T1map_TRUFI_40DEG shorter_82',
+    #                  '27apr2016_trio/T1map_TRUFI_40DEG shorter_82']
+                      
+               
+    parent_folder= os.getcwd()
+    for jj, scan in enumerate(scans_to_process): 
+        folder = parent_folder + scan
+        images,TI=blood_tools.read_dicoms(folder,['InversionTime'])
+        
+        display_many(images)
+    
+if __name__ == '__main__':
+    test_display_many()
