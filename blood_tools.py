@@ -16,6 +16,7 @@ import time
 import matplotlib
 import xlwt
 import itertools
+import re
 
 def calc_ROI_mean(ROI,images):
     """Calculate the mean of an ROI across a list of images"""
@@ -24,7 +25,6 @@ def calc_ROI_mean(ROI,images):
 
         for jj in np.arange(len(images)):
             mean[jj]=images[jj][ROI.get_indices()].mean()
-
     else:
         mean=images[ROI.get_indices()].mean()
     return mean
@@ -365,8 +365,7 @@ def check_T1_chi_surface(folders_to_process, sample):
     chi_surf=fit.contours(fit['T1'],fit['aa'],T1s,aas)
     return T1s, aas, chi_surf    
     
-        
-       
+          
 def make_case_report_csv(T2_dict,T1_dict,filename):
     book = xlwt.Workbook(encoding="utf-8")  
     sheet1 = book.add_sheet("sheet1")           
@@ -547,8 +546,6 @@ def T1_MOLLI_bootstrap_everyTI(folder,N=1000):
     return T1s, T1_errs     
     
     
-    
-        
 def plot_T2_contour(esp, model):
     """Given a model (defined according to fitting.py) will plot constant sO2 contours as a function of Hct for 
     a given esp (in seconds)""" 
@@ -670,25 +667,24 @@ def calc_R2(x,a1,a2,a3,b1,b2,c1):
     return R2
     
 def get_T2_prep_times_VB17(foldername):
-    
     file_list=os.listdir(foldername)
     dicom_filename = foldername +'/' + file_list[0]
     hdr=dicom.read_file(dicom_filename)
     out=(hdr[(0x0029,0x1020)])
     
-    import re #using regular expressions
-    #First look up the number of preps
     pat='sWiPMemBlock.alFree\[2\][ ]+=[ ]([.\d]+)'
-    num_preps=int(re.findall(pat,str(out.value))[0])
+
+    re_match = re.findall(pat,str(out.value))   
+    if not re_match:
+        return []
     
+    num_preps=int(re_match[0])
     pat='sWiPMemBlock.adFree\[\d+\][ ]+=[ ]([.\d]+)'
-    value_list=re.findall(pat, str(out.value))[0:num_preps]
-    prep_times=[float(prep_time)-0.001 for prep_time in value_list]
-    
+    value_list = re_match[0:num_preps]
+    prep_times = [float(prep_time)-0.001 for prep_time in value_list]
     return prep_times
     
 def get_T2_prep_times_VE11(foldername):
-    
     file_list=os.listdir(foldername)
     dicom_filename = foldername +'/' + file_list[0]
     hdr=dicom.read_file(dicom_filename)
@@ -699,12 +695,16 @@ def get_T2_prep_times_VE11(foldername):
     import re #using regular expressions
     #First look up the number of preps
     pat='sPrepPulses.adT2PrepDuration.__attribute__.size[ ]+=[ ]+([\d]+)'
-    num_preps=int(re.findall(pat,out)[0])
+    re_match = re.findall(pat,out)
+    
+    if not re_match:
+        return []
+    
+    num_preps=int(re_match[0])
     
     pat='sPrepPulses.adT2PrepDuration\[\d+\][ ]+=[ ]+([.\d]+)'
-    value_list=re.findall(pat, out)[0:num_preps]
-    prep_times=[float(prep_time)-0.001 for prep_time in value_list]
-    
+    value_list=re_match[0:num_preps]
+    prep_times=[float(prep_time)-0.001 for prep_time in value_list] 
     return prep_times    
     
     

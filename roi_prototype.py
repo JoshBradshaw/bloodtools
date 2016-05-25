@@ -1,7 +1,10 @@
+# -*- coding: utf-8 -*-
 """
-Created on Mon May 16 10:47:18 2016
-@author: mdurant
+Created on Tue May 24 13:09:08 2016
+
+@author: Josh
 """
+
 from PyQt4 import QtGui, QtCore
 import qtawesome
 import traceback
@@ -12,7 +15,18 @@ from matplotlib.figure import Figure
 import ROI
 import blood_tools
 
+import numpy as np
+import os,sys
+import pylab as plt
+
 def MyPyQtSlot(*args):
+    """
+    for strange, mostly undocumented reasons, the default behaviour of PyQt
+    is to silence all exceptions, which makes the debugging process roughly 
+    equivilant in difficulty to trying to speak portugeuse when you don't know 
+    any portugeuse. Inserting this decorator on every function is a kludgy way
+    to make PyQt catch exceptions as you would except.
+    """
     if len(args) == 0 or isinstance(args[0], types.FunctionType):
         args = []
     @QtCore.pyqtSlot(*args)
@@ -24,34 +38,43 @@ def MyPyQtSlot(*args):
             except:
                 print "Uncaught Exception in slot"
                 traceback.print_exc()
-                traceback.print_tb()
         return wrapper
 
     return slotdecorator
 
-class PlotWidget(QtGui.QWidget):
+class ROISelectPlot(QtGui.QWidget):
+    """
+    The plot canvas for the image, in the left pane of the GUI. This is where
+    the plot is displayed, and the ROI is selected.
+    
+    To implement:
+     - single ROI selection for multiple slices
+     - multiple ROI selection for multiple slices
+     - next/prev slice advancement with a progress indicator
+    """
     @MyPyQtSlot("bool")    
     def __init__(self, parent=None):
-        super(PlotWidget, self).__init__(parent)
+        super(ROISelectPlot, self).__init__(parent)
         self.r = None
         self.figure = Figure()
         self.axes = self.figure.add_subplot(111, autoscale_on=True)
+        
         self.canvas = FigureCanvas(self.figure)
-        self.toolbar = NavigationToolbar2QT(self.canvas, self)
+        #self.toolbar = NavigationToolbar2QT(self.canvas, self)
 
         # set the layout
         layout = QtGui.QVBoxLayout()
         layout.addWidget(self.canvas)
-        layout.addWidget(self.toolbar)
+        #layout.addWidget(self.toolbar)
         self.setLayout(layout)
-        #self.make_image(np.zeros((10, 10)))
         
     @MyPyQtSlot("bool")
     def make_image(self, im):
         self.clear_roi()
         self.axes.clear()
 
-        self.im = self.axes.imshow(im)
+        self.im = self.axes.imshow(im, vmin=np.percentile(im, 5),vmax=np.percentile(im, 95), cmap='gray')
+        self.figure.canvas.draw()
         
     @MyPyQtSlot("bool")
     def new_roi(self):
@@ -62,13 +85,33 @@ class PlotWidget(QtGui.QWidget):
         if self.r is not None: # check if there is an ROI
             self.r.patch.remove()
             self.r.disconnect()
-            self.axes.lines.clear()
+            #self.axes.lines.clear()
             
     @MyPyQtSlot("bool")
     def get_roi(self):
         return self.r.get_mask()
+        
+class T2CurvePlot(QtGui.QWidget):
+    """
+    The plot that displays the datapoints, the fitted monoexponential T2 curve, 
+    and gives the value for T2 based on this fit.
+    """
+    @MyPyQtSlot("bool")    
+    def __init__(self, parent=None):
+        super(T2CurvePlot, self).__init__(parent)
+        self.r = None
+        self.figure = Figure()
+        self.axes = self.figure.add_subplot(111, autoscale_on=True)
+        
+        self.canvas = FigureCanvas(self.figure)
+        #self.toolbar = NavigationToolbar2QT(self.canvas, self)
 
-
+        # set the layout
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(self.canvas)
+        #layout.addWidget(self.toolbar)
+        self.setLayout(layout)
+        
 class MainWindow(QtGui.QWidget):
     @MyPyQtSlot("bool")
     def __init__(self):
@@ -82,8 +125,8 @@ class MainWindow(QtGui.QWidget):
         self.combo_relax.addItems(['T1', 'T2'])
         self.combo_relax.setCurrentIndex(0)
         
-        self.plot_im = PlotWidget(self)
-        self.plot_graph = PlotWidget(self)
+        self.plot_im = ROISelectPlot(self)
+        self.plot_graph = T2CurvePlot(self)
         
         layout_top = QtGui.QHBoxLayout()
         layout_top.addWidget(button_load)
@@ -111,8 +154,8 @@ class MainWindow(QtGui.QWidget):
         
         if out:
             self.directory = out
-            image=blood_tools.read_dicoms(out,[])[0][0]
-            self.plot_im.make_image(image)
+            self.images, self.image_attributes = blood_tools.read_dicoms(out,[])
+            self.plot_im.make_image(self.images[0])
         else: # user hit the cancel or x button to leave the dialog
             pass
     
@@ -124,15 +167,39 @@ class MainWindow(QtGui.QWidget):
             self.plot_im.clear_roi()
     
     @MyPyQtSlot("bool")
-    def process_data(self):
+    def process_data(self, event):
         roi_mask = self.plot_im.get_roi()
         relax = self.combo_relax.currentText()
-        x, y = make_graph_from_dir_and_mask(self.directory, roi_mask)
+        # todo - implement this method
+        x, y = make_T2_fit_from_directory_and_mask(self.directory, self.images, roi_mask)
         self.plot_graph.axes.clear()
         self.plot_graph.axes.plot(x, y, 'k+')
         x, y, parameters = make_fit_from_data(x, y, relax)
         self.plot_graph.axes.plot(x, y, 'r-')
         self.plot_graph.axes.figure.text(figx, figy, parameters)
+        
+                    
+def make_T2_fit_from_directory_and_mask(dicom_directory, images, ROI_mask):
+    """
+    Simplest case: makes a T2 monoexponential fit given a directory of T2 
+    DICOMs and a single ROI mask.
+    """
+    # get T2 prep times
+    # VE11 is the new Siemens software, VE17 is the old version
+    VE17_prep_times = blood_tools.get_T2_prep_times_VB17(dicom_directory)     
+    VE11_prep_times = blood_tools.get_T2_prep_times_VE11(dicom_directory)
+    
+    if VE11_prep_times:
+        prep_times = VE11_prep_times
+    else:
+        prep_times = VE17_prep_times
+    
+    mean_signal_magnitude = blood_tools.calc_ROI_mean(ROI_mask,images)
+    
+    print "Prep times: {}".format(prep_times)
+    print "T2 signal intensities: {}".format(mean_signal_magnitude)    
+    return prep_times, mean_signal_magnitude
+
 
 def main():
     app = QtGui.QApplication.instance() or QtGui.QApplication([])
