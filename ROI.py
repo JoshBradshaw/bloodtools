@@ -230,7 +230,6 @@ class ROIcircle(ROI):
                 self.circ = None
             self.fig.canvas.draw()
 
-
     def get_coords(self):
         """Returns the x,y coordinates of that have been selected
         so far."""
@@ -316,22 +315,18 @@ class ROIellipse(ROIcircle):
         return ellipse(y, x, h/2., w/2., self.im)
 
 
-def new_ROI(im=None, shape='polygon'):
+def new_ROI(image, axis, figure, shape='polygon'):
     """Set up an ROI picker and return it. This is the only way that the
     ROI class should be involked. Requires an input image (the thing
     returned by imshow), or can try the latest image in the current
     axes."""
-    plt.ion()
-    im = plt.gci() if im is None else im
-    if im == None: raise ValueError('No image to pick on')
-    ax = im.axes
-    fig = ax.figure
+    
     if shape=='polygon' or shape=='p':
-        cursor = ROI(im, ax, fig)
+        cursor = ROI(image, axis, figure)
     elif shape=='circle' or shape=='c':
-        cursor = ROIcircle(im, ax, fig)
+        cursor = ROIcircle(image, axis, figure)
     elif shape=='ellipse' or shape=='e':
-        cursor = ROIellipse(im, ax, fig)
+        cursor = ROIellipse(image, axis, figure)
     elif shape=='rectangle' or shape=='r':
         raise NotImplementedError("Rectangle ROI not yet created")
     else:

@@ -78,18 +78,22 @@ class ROISelectPlot(QtGui.QWidget):
         
     @MyPyQtSlot("bool")
     def new_roi(self):
-        self.r = ROI.new_ROI(self.im)
+        self.r = ROI.new_ROI(self.im, self.axes, self.figure)
         
     @MyPyQtSlot("bool")
     def clear_roi(self):
+        print "clear ROI called!!"        
+        
         if self.r is not None: # check if there is an ROI
             self.r.patch.remove()
             self.r.disconnect()
-            #self.axes.lines.clear()
+            self.axes.lines = []
+            self.r = None
+            self.figure.canvas.draw()
             
     @MyPyQtSlot("bool")
     def get_roi(self):
-        return self.r.get_mask()
+        return self.r
         
 class T2CurvePlot(QtGui.QWidget):
     """
@@ -168,18 +172,20 @@ class MainWindow(QtGui.QWidget):
     
     @MyPyQtSlot("bool")
     def process_data(self, event):
-        roi_mask = self.plot_im.get_roi()
+        roi = self.plot_im.r 
+        
         relax = self.combo_relax.currentText()
         # todo - implement this method
-        x, y = make_T2_fit_from_directory_and_mask(self.directory, self.images, roi_mask)
+        x, y = make_T2_fit_from_directory_and_mask(self.directory, self.images, roi)
         self.plot_graph.axes.clear()
-        self.plot_graph.axes.plot(x, y, 'k+')
-        x, y, parameters = make_fit_from_data(x, y, relax)
-        self.plot_graph.axes.plot(x, y, 'r-')
-        self.plot_graph.axes.figure.text(figx, figy, parameters)
+        self.plot_graph.axes.plot(x, y, 'ro')
+        self.plot_graph.figure.canvas.draw()
+        #x, y, parameters = make_fit_from_data(x, y, relax)
+        #self.plot_graph.axes.plot(x, y, 'r-')
+        #self.plot_graph.axes.figure.text(figx, figy, parameters)
         
                     
-def make_T2_fit_from_directory_and_mask(dicom_directory, images, ROI_mask):
+def make_T2_fit_from_directory_and_mask(dicom_directory, images, roi):
     """
     Simplest case: makes a T2 monoexponential fit given a directory of T2 
     DICOMs and a single ROI mask.
@@ -188,13 +194,16 @@ def make_T2_fit_from_directory_and_mask(dicom_directory, images, ROI_mask):
     # VE11 is the new Siemens software, VE17 is the old version
     VE17_prep_times = blood_tools.get_T2_prep_times_VB17(dicom_directory)     
     VE11_prep_times = blood_tools.get_T2_prep_times_VE11(dicom_directory)
+
+    print "VE11 preps: {}".format(VE11_prep_times)
+    print "VE17 preps: {}".format(VE17_prep_times)    
     
     if VE11_prep_times:
         prep_times = VE11_prep_times
     else:
         prep_times = VE17_prep_times
     
-    mean_signal_magnitude = blood_tools.calc_ROI_mean(ROI_mask,images)
+    mean_signal_magnitude = blood_tools.calc_ROI_mean(roi, images)
     
     print "Prep times: {}".format(prep_times)
     print "T2 signal intensities: {}".format(mean_signal_magnitude)    

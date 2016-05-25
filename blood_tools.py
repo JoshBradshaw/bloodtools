@@ -18,15 +18,15 @@ import xlwt
 import itertools
 import re
 
-def calc_ROI_mean(ROI,images):
+def calc_ROI_mean(roi,images):
     """Calculate the mean of an ROI across a list of images"""
     if isinstance(images,list):
         mean=np.zeros(len(images))
 
         for jj in np.arange(len(images)):
-            mean[jj]=images[jj][ROI.get_indices()].mean()
+            mean[jj]=images[jj][roi.get_indices()].mean()
     else:
-        mean=images[ROI.get_indices()].mean()
+        mean=images[roi.get_indices()].mean()
     return mean
 
 def calc_ROI_serr(ROI,images):
@@ -670,18 +670,17 @@ def get_T2_prep_times_VB17(foldername):
     file_list=os.listdir(foldername)
     dicom_filename = foldername +'/' + file_list[0]
     hdr=dicom.read_file(dicom_filename)
-    out=(hdr[(0x0029,0x1020)])
-    
+    out=(hdr[(0x0029,0x1020)])    
     pat='sWiPMemBlock.alFree\[2\][ ]+=[ ]([.\d]+)'
-
-    re_match = re.findall(pat,str(out.value))   
-    if not re_match:
-        return []
     
-    num_preps=int(re_match[0])
+    if not re.findall(pat,str(out.value)):
+        return []        
+        
+    num_preps=int(re.findall(pat,str(out.value))[0])    
     pat='sWiPMemBlock.adFree\[\d+\][ ]+=[ ]([.\d]+)'
-    value_list = re_match[0:num_preps]
-    prep_times = [float(prep_time)-0.001 for prep_time in value_list]
+    value_list=re.findall(pat, str(out.value))[0:num_preps]
+    prep_times=[float(prep_time)-0.001 for prep_time in value_list]
+    
     return prep_times
     
 def get_T2_prep_times_VE11(foldername):
@@ -690,22 +689,18 @@ def get_T2_prep_times_VE11(foldername):
     hdr=dicom.read_file(dicom_filename)
     out=repr(hdr[(0x0029,0x1020)].value)
     out=out.replace('\\t',' ')
-    out=out.replace('\\n','\n')
-    
-    import re #using regular expressions
-    #First look up the number of preps
+    out=out.replace('\\n','\n')    
     pat='sPrepPulses.adT2PrepDuration.__attribute__.size[ ]+=[ ]+([\d]+)'
-    re_match = re.findall(pat,out)
-    
-    if not re_match:
+    if not re.findall(pat,out):
         return []
     
-    num_preps=int(re_match[0])
+    num_preps=int(re.findall(pat,out)[0])
     
     pat='sPrepPulses.adT2PrepDuration\[\d+\][ ]+=[ ]+([.\d]+)'
-    value_list=re_match[0:num_preps]
-    prep_times=[float(prep_time)-0.001 for prep_time in value_list] 
-    return prep_times    
+    value_list=re.findall(pat, out)[0:num_preps]
+    prep_times=[float(prep_time)-0.001 for prep_time in value_list]
+    
+    return prep_times     
     
     
 def plateau_detect(sig, slope_threshold=-5, factor=2):
