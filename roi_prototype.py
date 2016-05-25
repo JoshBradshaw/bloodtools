@@ -14,10 +14,7 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import ROI
 import blood_tools
-
 import numpy as np
-import os,sys
-import pylab as plt
 
 def MyPyQtSlot(*args):
     """
@@ -55,7 +52,7 @@ class ROISelectPlot(QtGui.QWidget):
     @MyPyQtSlot("bool")    
     def __init__(self, parent=None):
         super(ROISelectPlot, self).__init__(parent)
-        self.r = None
+        self.roi = None
         self.figure = Figure()
         self.axes = self.figure.add_subplot(111, autoscale_on=True)
         
@@ -72,28 +69,31 @@ class ROISelectPlot(QtGui.QWidget):
     def make_image(self, im):
         self.clear_roi()
         self.axes.clear()
-
+        
+        # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
+        self.axes.set_autoscale_on(True)
         self.im = self.axes.imshow(im, vmin=np.percentile(im, 5),vmax=np.percentile(im, 95), cmap='gray')
         self.figure.canvas.draw()
+        self.axes.set_autoscale_on(False)
         
     @MyPyQtSlot("bool")
     def new_roi(self):
-        self.r = ROI.new_ROI(self.im, self.axes, self.figure)
+        self.roi = ROI.new_ROI(self.im, self.axes, self.figure)
         
     @MyPyQtSlot("bool")
     def clear_roi(self):
         print "clear ROI called!!"        
         
-        if self.r is not None: # check if there is an ROI
-            self.r.patch.remove()
-            self.r.disconnect()
+        if self.roi is not None: # check if there is an ROI
+            self.roi.patch.remove()
+            self.roi.disconnect()
             self.axes.lines = []
-            self.r = None
+            self.roi = None
             self.figure.canvas.draw()
             
     @MyPyQtSlot("bool")
     def get_roi(self):
-        return self.r
+        return self.roi
         
 class T2CurvePlot(QtGui.QWidget):
     """
@@ -103,7 +103,7 @@ class T2CurvePlot(QtGui.QWidget):
     @MyPyQtSlot("bool")    
     def __init__(self, parent=None):
         super(T2CurvePlot, self).__init__(parent)
-        self.r = None
+        self.roi = None
         self.figure = Figure()
         self.axes = self.figure.add_subplot(111, autoscale_on=True)
         
@@ -122,9 +122,25 @@ class MainWindow(QtGui.QWidget):
         QtGui.QWidget.__init__(self, parent=None)
         
         button_load = QtGui.QPushButton(qtawesome.icon('fa.folder-open-o'), '')
-        self.button_roi = QtGui.QCheckBox("ROI")
-        button_run = QtGui.QPushButton(qtawesome.icon('fa.play'), '')
-        self.button_roi.setChecked(False)
+        button_run = QtGui.QPushButton('Fit Data') 
+        button_draw_roi = QtGui.QPushButton('Draw ROI') 
+        
+        button_slice_fwd = QtGui.QPushButton(qtawesome.icon('fa.chevron-right'), '')
+        button_slice_bwd = QtGui.QPushButton(qtawesome.icon('fa.chevron-left'), '')
+        
+        button_slice_first = QtGui.QPushButton(qtawesome.icon('fa.step-backward'), '')
+        button_slice_last = QtGui.QPushButton(qtawesome.icon('fa.step-forward'), '')
+        self.slice_label = QtGui.QLabel('(0/0)')
+        
+        self.combo_roi_scope = QtGui.QComboBox()   
+        self.combo_roi_scope.addItems(['This Slice','All Slices'])
+        self.combo_roi_scope.setCurrentIndex(0)
+
+        self.combo_roi_style = QtGui.QComboBox()
+        self.combo_roi_style.addItems(['Polygon','Circle', 'Ellipse'])
+        self.combo_roi_style.setCurrentIndex(0)
+        
+        combo_relax_label = QtGui.QLabel('Fit Type')
         self.combo_relax = QtGui.QComboBox()
         self.combo_relax.addItems(['T1', 'T2'])
         self.combo_relax.setCurrentIndex(0)
@@ -134,7 +150,24 @@ class MainWindow(QtGui.QWidget):
         
         layout_top = QtGui.QHBoxLayout()
         layout_top.addWidget(button_load)
-        layout_top.addWidget(self.button_roi)
+        
+        layout_top.addWidget(QtGui.QLabel('     '))
+        layout_top.addWidget(QtGui.QLabel('Change Slice:'))
+
+        layout_top.addWidget(button_slice_first)
+        layout_top.addWidget(button_slice_bwd)
+        layout_top.addWidget(button_slice_fwd) 
+        layout_top.addWidget(button_slice_last)
+        layout_top.addWidget(self.slice_label)
+        
+        layout_top.addWidget(QtGui.QLabel('     '))
+        layout_top.addWidget(QtGui.QLabel('ROI Style:'))
+        layout_top.addWidget(self.combo_roi_style)
+        layout_top.addWidget(QtGui.QLabel('Apply ROI to:'))
+        layout_top.addWidget(self.combo_roi_scope)
+        layout_top.addWidget(button_draw_roi)
+        layout_top.addWidget(QtGui.QLabel('     '))
+        layout_top.addWidget(combo_relax_label)
         layout_top.addWidget(self.combo_relax)
         layout_top.addWidget(button_run)
         layout_top.addStretch()
@@ -149,8 +182,20 @@ class MainWindow(QtGui.QWidget):
         self.setLayout(layout_main)
         
         button_load.clicked.connect(self.choose_dir)
-        self.button_roi.stateChanged.connect(self.start_roi)
         button_run.clicked.connect(self.process_data)
+        button_draw_roi.connect(self.start_roi)
+    
+    @MyPyQtSlot("bool")
+    def get_roi_scope(self):
+        return self.combo_roi_scope.currentText()
+        
+    @MyPyQtSlot("bool")
+    def get_roi_style(self):
+        return self.combo_roi_scope.currentText()
+    
+    @MyPyQtSlot("bool")
+    def get_relax_type(self):
+        return self.combo_roi_scope.currentText()
     
     @MyPyQtSlot("bool")
     def choose_dir(self, event):
@@ -164,25 +209,35 @@ class MainWindow(QtGui.QWidget):
             pass
     
     @MyPyQtSlot("bool")
-    def start_roi(self, state):
-        if state:
-            self.plot_im.new_roi()
-        else:
-            self.plot_im.clear_roi()
+    def start_roi(self, event):
+        roi_style = self.get_roi_style()
+        roi_scope = self.get_roi_scope()
+        
+        self.plot_im.clear_roi()
+        self.plot_im.new_roi()
+        
     
     @MyPyQtSlot("bool")
     def process_data(self, event):
-        roi = self.plot_im.r 
+        relaxation_type = self.get_relax_type()         
+        
+        roi = self.plot_im.roi 
         
         relax = self.combo_relax.currentText()
         # todo - implement this method
-        x, y = make_T2_fit_from_directory_and_mask(self.directory, self.images, roi)
-        self.plot_graph.axes.clear()
-        self.plot_graph.axes.plot(x, y, 'ro')
-        self.plot_graph.figure.canvas.draw()
-        #x, y, parameters = make_fit_from_data(x, y, relax)
-        #self.plot_graph.axes.plot(x, y, 'r-')
-        #self.plot_graph.axes.figure.text(figx, figy, parameters)
+        
+        if relaxation_type == 'T1':
+            raise NotImplementedError("T1 mapping has not been implemented yet")            
+        elif relaxation_type == 'T2':    
+            x, y = make_T2_fit_from_directory_and_mask(self.directory, self.images, roi)
+            self.plot_graph.axes.clear()
+            self.plot_graph.axes.plot(x, y, 'ro')
+            self.plot_graph.figure.canvas.draw()
+            #x, y, parameters = make_fit_from_data(x, y, relax)
+            #self.plot_graph.axes.plot(x, y, 'r-')
+            #self.plot_graph.axes.figure.text(figx, figy, parameters)
+        else:
+            raise NotImplementedError("This mapping type's fitting algorithm has not been implemented yet") 
         
                     
 def make_T2_fit_from_directory_and_mask(dicom_directory, images, roi):

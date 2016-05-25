@@ -12,7 +12,6 @@ import fitting
 import pylab as plt
 import dicom
 import sys
-import time
 import matplotlib
 import xlwt
 import itertools
@@ -532,7 +531,6 @@ def T1_MOLLI_bootstrap_everyTI(folder,N=1000):
         print npix
         pixels=roi.get_indices()
         
-        
         for nn in np.arange(N):
             sig_boot=np.zeros(len(TIs))
             for jj in np.arange(len(TIs)):        
@@ -621,7 +619,6 @@ def retrieve_dict_data(T2_dict, esp=0, metHb_threshold=0.02):
                 
     return sO2s, Hcts, esps, R2s, R2errs, metHbs, pt_nos, T2s, T2errs   
 
-
 def retrieve_T1_dict_data(T1_dict, metHb_threshold=0.02):
     R1s=[]
     R1errs=[]
@@ -644,7 +641,6 @@ def retrieve_T1_dict_data(T1_dict, metHb_threshold=0.02):
   
     return sO2s, Hcts, metHbs, R1s, R1errs, pt_nos, T1s, T1errs
 
-
 def retrieve_chi_dict_data(chi_dict, metHb_threshold=0.02):
     chis=[]
     sO2s=[]
@@ -658,9 +654,7 @@ def retrieve_chi_dict_data(chi_dict, metHb_threshold=0.02):
     metHbs.append([item[0][2] for item in dict_data if item[0][2]<metHb_threshold])
     pt_nos.append([item[0][3] for item in dict_data if item[0][2]<metHb_threshold])
     chis.append([item[1] for item in dict_data if item[0][2]<metHb_threshold])
- 
     return sO2s, Hcts, metHbs, pt_nos, chis
-
 
 def calc_R2(x,a1,a2,a3,b1,b2,c1):
     R2=(a1+a2*x[0]+a3*x[0]**2) + (b1*x[0]+b2*x[0]**2)*(1-x[1]) + (c1*x[0]*(1-x[0]))*(1-x[1])**2      
@@ -680,7 +674,6 @@ def get_T2_prep_times_VB17(foldername):
     pat='sWiPMemBlock.adFree\[\d+\][ ]+=[ ]([.\d]+)'
     value_list=re.findall(pat, str(out.value))[0:num_preps]
     prep_times=[float(prep_time)-0.001 for prep_time in value_list]
-    
     return prep_times
     
 def get_T2_prep_times_VE11(foldername):
@@ -707,7 +700,6 @@ def plateau_detect(sig, slope_threshold=-5, factor=2):
     """To eliminate the noise floor from a subsequent T2 fit, returns the index
     of the first element more than double the plateau value.  A plateau is defined
     as a region with slope>slope_threshold"""
-    
     
     sig_diff=np.diff(sig)  
     plateau=np.where(sig_diff>-5)[0]
