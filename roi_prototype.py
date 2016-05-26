@@ -91,6 +91,15 @@ class ROISelectPlot(QtGui.QWidget):
     def get_roi(self):
         return self.roi
         
+    def get_axes(self):
+        return self.axes
+        
+    def get_mpl_im(self):
+        return self.mpl_im
+        
+    def get_figure(self):
+        return self.figure
+        
 class T2CurvePlot(QtGui.QWidget):
     """
     The plot that displays the datapoints, the fitted monoexponential T2 curve, 
@@ -243,18 +252,17 @@ class MainWindow(QtGui.QWidget):
     
     @QTSlotExceptionRationalizer("bool")
     def start_roi(self):
+        if not len(self.images) > 0:
+            error = QtGui.QErrorMessage()
+            error.showMessage('You must a load a series of images before drawing the ROI')
+            error.exec_()        
+        
         roi_style = self.get_roi_style().lower() # style names are lowercase in ROI.py
         roi_scope = self.get_roi_scope()
         
         self.plot_im.clear_roi()
-        
-        if len(self.images) > 0:
-            self.plot_im.image_ROI = ROI.new_ROI(self.plot_im.mpl_im, self.plot_im.axes, 
-                        self.plot_im.figure, shape=roi_style)
-        else:
-            error = QtGui.QErrorMessage()
-            error.showMessage('You must a load a series of images before drawing the ROI')
-            error.exec_()
+        self.plot_im.image_ROI = ROI.new_ROI(self.plot_im.get_mpl_im(), 
+        self.plot_im.get_axes(), self.plot_im.get_figure(), shape=roi_style)
         
     @QTSlotExceptionRationalizer("bool")
     def process_data(self, event):

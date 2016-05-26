@@ -64,8 +64,7 @@ class ROI(object):
                                    [self.previous_point[1], y])      
                 self.fig.canvas.draw()
             elif event.button == 1: # Free Hand Drawing
-                    line = plt.Line2D([self.previous_point[0], x],
-                                  [self.previous_point[1], y])                  
+                    line = plt.Line2D([self.previous_point[0], x], [self.previous_point[1], y])                  
   
                     ax.add_line(line)
                     self.lines.append(line)
@@ -81,7 +80,6 @@ class ROI(object):
         if event.inaxes: 
             x, y = event.xdata, event.ydata
             ax = event.inaxes
-            
             if event.button == 1:  # If you press the left button
                 if self.line == None: # if there is no line, create a line
                     self.line = plt.Line2D([x,  x],[y, y],marker = '.')
@@ -171,7 +169,6 @@ class ROI(object):
 
 class ROIcircle(ROI):
     def __init__(self, im, ax, fig):
-        super(ROIcircle, self).__init__(im, ax, fig)
         self.circ = None    
         self.im = im.get_size()
         self.fig =  fig
