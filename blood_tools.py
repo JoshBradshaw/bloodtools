@@ -75,20 +75,20 @@ def read_dicoms(foldername, attributes=[]):
     attribute_list=[]
 
     for file_name in file_list:
+        dicom_read_success = True    
         attribute_dict={}
+        
         try:
             image=dicom.read_file(os.path.join(foldername, file_name))
-            image_list.append(image.pixel_array)
-#            attribute_list.append([getattr(image,item,0) for item in attributes])
-            if attributes:            
-                for item in attributes:
-                    attribute_dict[item]=getattr(image,item,0)            
-                attribute_list.append(attribute_dict)
-            
         except dicom.filereader.InvalidDicomError:
-            print "Error, invalid dicom file: {}".format(os.path.join(foldername, file))            
-            continue
-   
+            print "Error, invalid dicom file: {}".format(os.path.join(foldername, file))
+            continue            
+            
+        image_list.append(image.pixel_array)
+        attribute_dict['filename'] = file_name
+        for item in attributes:
+            attribute_dict[item]=getattr(image,item,0)       
+        attribute_list.append(attribute_dict)
     return image_list, attribute_list       
 
 def img_roi_signal(folders_to_process,attributes=[]):
@@ -719,9 +719,7 @@ def plateau_detect(sig, slope_threshold=-5, factor=2):
         
     return stop_index    
     
-    
 def bootstrap_fit(folder, roi,  model, x, iterations=100):
-
     image_list,TEs=read_dicoms(folder,['EchoTime'])    
     
     npix=len(roi.get_indices()[0])

@@ -8,7 +8,7 @@ from skimage.draw import polygon, circle, ellipse
 import numpy as np
 from matplotlib.patches import Ellipse
 
-class ROI:
+class ROI(object):
     """Draw and ROI on a matplotlib figure, and get back the coords,
     indices or mask of the resultant polygon. Left click to place 
     points, left hold to draw freehand, right click to finalise, middle
@@ -73,7 +73,6 @@ class ROI:
                     self.fig.canvas.draw()
                     self.xcoords.append(x)
                     self.ycoords.append(y)
-
         
     def button_press_callback(self, event):
         """Left button: add point; middle button: delete point;
@@ -151,16 +150,16 @@ class ROI:
         return im
         
     def remove(self):
-        """Take ROI polygon/lines off the image."""
+        """Take ROI polygon/lines off the image."""   
+        
         for l in self.lines:
             l.remove()
-            self.patch.remove()  
             
+        self.patch.remove()
         self.lines = []
         self.line = None
         self.patch = None
         self.disconnect()
-        plt.draw()
         
     def disconnect(self):
         """Remove interaction, which by default persists even when the
@@ -170,9 +169,9 @@ class ROI:
         self.fig.canvas.mpl_disconnect(self.events[0])
         self.fig.canvas.mpl_disconnect(self.events[1])
 
-
 class ROIcircle(ROI):
     def __init__(self, im, ax, fig):
+        super(ROIcircle, self).__init__(im, ax, fig)
         self.circ = None    
         self.im = im.get_size()
         self.fig =  fig
@@ -188,7 +187,6 @@ class ROIcircle(ROI):
     def __setstate__(self, d):
         self.im = d['im']
         self.circ = plt.Circle(*d['circle'], facecolor='none', edgecolor='b')
-
         
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -250,10 +248,8 @@ class ROIcircle(ROI):
             self.circ.remove()
             self.circ = None
         self.disconnect()
-        plt.draw()
 
-
-class ROIellipse(ROIcircle):
+class ROIellipse(ROIcircle): 
     def __getstate__(self):
         return {'im':self.im, 'circle':(self.circ.center, self.circ.width,
                                         self.circ.height)}
@@ -314,7 +310,6 @@ class ROIellipse(ROIcircle):
         (x, y), w, h = coo
         return ellipse(y, x, h/2., w/2., self.im)
 
-
 def new_ROI(image, axis, figure, shape='polygon'):
     """Set up an ROI picker and return it. This is the only way that the
     ROI class should be involked. Requires an input image (the thing
@@ -332,7 +327,6 @@ def new_ROI(image, axis, figure, shape='polygon'):
     else:
         raise ValueError("ROI shape must not understood")
     return cursor
-
 
 def draw_ROI(self,im=None):
     """Draw the ROI on an image"""
@@ -353,4 +347,4 @@ def draw_ROI(self,im=None):
         mycirc.set_facecolor('none')
         plt.gca().add_artist(mycirc)
     
-    return 0    
+    return 0

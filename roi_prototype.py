@@ -15,6 +15,7 @@ from matplotlib.figure import Figure
 import ROI
 import blood_tools
 import numpy as np
+from pprint import pprint
 
 def QTSlotExceptionRationalizer(*args):
     """
@@ -23,6 +24,9 @@ def QTSlotExceptionRationalizer(*args):
     equivilant in difficulty to trying to speak portugeuse when you don't know 
     any portugeuse. Inserting this decorator on every function is a kludgy way
     to make PyQt catch exceptions as you would except.
+    
+    DO NOT WRAP ANY METHODS OTHER THAN SLOT HANDLERS WITH THIS DECORATOR, IT
+    BREAKS FUNCTION RETURNS!!!
     """
     if len(args) == 0 or isinstance(args[0], types.FunctionType):
         args = []
@@ -52,7 +56,7 @@ class ROISelectPlot(QtGui.QWidget):
     @QTSlotExceptionRationalizer("bool")    
     def __init__(self, parent=None):
         super(ROISelectPlot, self).__init__(parent)
-        self.roi = None
+        self.image_ROI = None
         self.figure = Figure()
         self.axes = self.figure.add_subplot(111, autoscale_on=True)
         
@@ -71,24 +75,19 @@ class ROISelectPlot(QtGui.QWidget):
         
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
         self.axes.set_autoscale_on(True)
-        self.im = self.axes.imshow(im, vmin=np.percentile(im, 5),vmax=np.percentile(im, 95), cmap='gray')
+        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, 5),vmax=np.percentile(im, 95), cmap='gray')
         self.figure.canvas.draw()
         self.axes.set_autoscale_on(False)
         
     @QTSlotExceptionRationalizer("bool")
-    def new_roi(self):
-        self.roi = ROI.new_ROI(self.im, self.axes, self.figure)
-        
-    @QTSlotExceptionRationalizer("bool")
     def clear_roi(self):        
-        if self.roi is not None: # check if there is an ROI
-            self.roi.patch.remove()
-            self.roi.disconnect()
+        if self.image_ROI is not None: # check if there is an ROI
+            self.image_ROI.remove()
+            self.image_ROI.disconnect()
             self.axes.lines = []
-            self.roi = None
             self.figure.canvas.draw()
+            self.image_ROI = None
             
-    @QTSlotExceptionRationalizer("bool")
     def get_roi(self):
         return self.roi
         
@@ -100,7 +99,6 @@ class T2CurvePlot(QtGui.QWidget):
     @QTSlotExceptionRationalizer("bool")    
     def __init__(self, parent=None):
         super(T2CurvePlot, self).__init__(parent)
-        self.roi = None
         self.figure = Figure()
         self.axes = self.figure.add_subplot(111, autoscale_on=True)
         self.canvas = FigureCanvas(self.figure)
@@ -202,39 +200,37 @@ class MainWindow(QtGui.QWidget):
     def change_image(self):
         sender_btn = self.sender().objectName()
         num_images = len(self.images)
-        
-        if sender_btn == 'slice_first':
-            self.image_index = 0
-        elif sender_btn == 'slice_bwd':
-            ind = self.image_index - 1
-            self.image_index = ind % num_images
-        elif sender_btn == 'slice_fwd':
-            ind = self.image_index + 1
-            self.image_index = ind % num_images
-        else:
-            self.image_index = num_images - 1
+        # prevent the buttons from raising div by zero exceptions when no images loaded
+        if num_images > 0:
+            if sender_btn == 'slice_first':
+                self.image_index = 0
+            elif sender_btn == 'slice_bwd':
+                ind = self.image_index - 1
+                self.image_index = ind % num_images
+            elif sender_btn == 'slice_fwd':
+                ind = self.image_index + 1
+                self.image_index = ind % num_images
+            else:
+                self.image_index = num_images - 1
         
         # display the slice selection label, with zero padding to keep the toolbar from shifting around
         num, demon = str(self.image_index+1).rjust(2, '0'), str(num_images).rjust(2, '0')
         self.slice_label.setText("{}/{}".format(num, demon))
         self.plot_im.make_image(self.images[self.image_index])
         
-    @QTSlotExceptionRationalizer("bool")
     def get_roi_scope(self):
         return self.combo_roi_scope.currentText()
-        
-    @QTSlotExceptionRationalizer("bool")
+
     def get_roi_style(self):
-        return self.combo_roi_scope.currentText()
+        current_text = self.combo_roi_style.currentText()
+        return current_text
     
-    @QTSlotExceptionRationalizer("bool")
     def get_relax_type(self):
-        return self.combo_roi_scope.currentText()
+        return self.combo_relax.currentText()
     
     @QTSlotExceptionRationalizer("bool")
     def choose_dir(self, event):
         out = QtGui.QFileDialog.getExistingDirectory(caption='MRI Data Directory')
-        
         if out:
             self.directory = out
             self.images, self.image_attributes = blood_tools.read_dicoms(out,[])
@@ -246,19 +242,25 @@ class MainWindow(QtGui.QWidget):
             pass
     
     @QTSlotExceptionRationalizer("bool")
-    def start_roi(self, event):
-        roi_style = self.get_roi_style()
+    def start_roi(self):
+        roi_style = self.get_roi_style().lower() # style names are lowercase in ROI.py
         roi_scope = self.get_roi_scope()
         
         self.plot_im.clear_roi()
-        self.plot_im.new_roi()
+        
+        if len(self.images) > 0:
+            self.plot_im.image_ROI = ROI.new_ROI(self.plot_im.mpl_im, self.plot_im.axes, 
+                        self.plot_im.figure, shape=roi_style)
+        else:
+            error = QtGui.QErrorMessage()
+            error.showMessage('You must a load a series of images before drawing the ROI')
+            error.exec_()
         
     @QTSlotExceptionRationalizer("bool")
     def process_data(self, event):
+        # todo add error message if images or ROI not loaded
         relaxation_type = self.get_relax_type()         
-        
-        roi = self.plot_im.roi 
-        
+        roi = self.plot_im.get_roi()
         relax = self.combo_relax.currentText()
         # todo - implement this method
         
@@ -274,7 +276,7 @@ class MainWindow(QtGui.QWidget):
             #self.plot_graph.axes.figure.text(figx, figy, parameters)
         else:
             raise NotImplementedError("This mapping type's fitting algorithm has not been implemented yet") 
-        
+            
 def make_T2_fit_from_directory_and_roi(dicom_directory, images, roi):
     """Simplest case: makes a T2 monoexponential fit given a directory of T2 
     DICOMs and a single ROI mask.
@@ -282,10 +284,7 @@ def make_T2_fit_from_directory_and_roi(dicom_directory, images, roi):
     # get T2 prep times
     # VE11 is the new Siemens software, VE17 is the old version
     VE17_prep_times = blood_tools.get_T2_prep_times_VB17(dicom_directory)     
-    VE11_prep_times = blood_tools.get_T2_prep_times_VE11(dicom_directory)
-
-    print "VE11 preps: {}".format(VE11_prep_times)
-    print "VE17 preps: {}".format(VE17_prep_times)    
+    VE11_prep_times = blood_tools.get_T2_prep_times_VE11(dicom_directory)  
     
     if VE11_prep_times:
         prep_times = VE11_prep_times
