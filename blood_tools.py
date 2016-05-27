@@ -81,7 +81,7 @@ def read_dicoms(foldername, attributes=[]):
         try:
             image=dicom.read_file(os.path.join(foldername, file_name))
         except dicom.filereader.InvalidDicomError:
-            print "Error, invalid dicom file: {}".format(os.path.join(foldername, file))
+            print "Error, invalid dicom file: {}".format(os.path.join(foldername, file_name))
             continue            
             
         image_list.append(image.pixel_array)
