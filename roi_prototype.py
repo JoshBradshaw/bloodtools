@@ -244,12 +244,13 @@ class MainWindow(QtGui.QWidget):
     @QTSlotExceptionRationalizer("bool")
     def roi_complete_callback(self):
         print "ROI complete callback called"      
-        roi_scope = self.get_roi_scope()
-        roi_style = self.get_roi_style()        
+        roi_scope = self.get_roi_scope()       
         
+        print roi_scope
+        print self.image_filename_list        
         if roi_scope == "All Slices":
             for img_fn in self.image_filename_list:
-                self.image_ROIs[self.image_filename] = self.activeROI
+                self.image_ROIs[img_fn] = self.activeROI
         else:
             self.image_ROIs[self.image_filename] = self.activeROI
         
@@ -287,9 +288,7 @@ class MainWindow(QtGui.QWidget):
     def load_roi(self):
         if self.image_filename in self.image_ROIs:
             self.activeROI = self.image_ROIs[self.image_filename]
-            axes = self.plot_im.get_axes()
-            figure = self.plot_im.get_figure()
-            ROI.draw_ROI(self.activeROI, axes, figure)
+            self.activeROI.draw()
     
     @QTSlotExceptionRationalizer("bool")
     def start_roi(self):

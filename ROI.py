@@ -38,7 +38,8 @@ class ROI(object):
         self.lines = []
         self.im = im.get_size()
         self.xcoords = []
-        self.ycoords = []       
+        self.ycoords = [] 
+        self.axes = ax
         self.fig =  fig
         self.fig.canvas.draw()
         self.patch = None
@@ -50,6 +51,20 @@ class ROI(object):
 
     def __getstate__(self):
         return {'im':self.im, 'xcoords':self.xcoords, 'ycoords':self.ycoords}
+        
+    def __setstate__(self, d):
+        self.im = d['im']
+        self.xcoords = d['xcoords']
+        self.ycoords= d['ycoords']
+        
+    def draw(self):
+        poly=plt.Polygon(zip(self.xcoords,self.ycoords))
+        poly.set_linewidth(1)
+        poly.set_alpha(1)
+        poly.set_edgecolor('r')
+        poly.set_facecolor('none')
+        self.patch = self.axes.add_patch(poly)
+        self.fig.canvas.draw()
         
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -65,7 +80,7 @@ class ROI(object):
                                    [self.previous_point[1], y])      
                 self.fig.canvas.draw()
             elif event.button == 1: # Free Hand Drawing
-                    line = plt.Line2D([self.previous_point[0], x], [self.previous_point[1], y])                  
+                    line = plt.Line2D([self.previous_point[0], x], [self.previous_point[1], y], color='r')                  
   
                     ax.add_line(line)
                     self.lines.append(line)
@@ -83,7 +98,7 @@ class ROI(object):
             ax = event.inaxes
             if event.button == 1:  # If you press the left button
                 if self.line == None: # if there is no line, create a line
-                    self.line = plt.Line2D([x,  x],[y, y],marker = '.')
+                    self.line = plt.Line2D([x,  x],[y, y],marker = '.', color='r')
                     self.start_point = [x,y]
                     self.previous_point =  self.start_point 
                     ax.add_line(self.line)
@@ -94,7 +109,7 @@ class ROI(object):
                 # add a segment
                 else: # if there is a line, create a segment
                     self.line = plt.Line2D([self.previous_point[0], x], 
-                                       [self.previous_point[1], y], marker = '.')
+                                       [self.previous_point[1], y], marker = '.', color='r')
                     self.previous_point = [x,y]
                     event.inaxes.add_line(self.line)
                     self.lines.append(self.line)
@@ -118,7 +133,7 @@ class ROI(object):
                 ax.add_line(self.line)
                 self.lines.append(self.line)
                 self.line = None
-                self.patch = ax.fill(self.xcoords,self.ycoords,alpha=0.1)[0]
+                self.patch = ax.fill(self.xcoords,self.ycoords,alpha=0)[0]
                 self.disconnect()
                 self.fig.canvas.draw()
                 self.completion_callback()
@@ -154,11 +169,12 @@ class ROI(object):
         
         for l in self.lines:
             l.remove()
+        if self.patch is not None:
+            self.patch.remove()
+            self.patch = None
             
-        self.patch.remove()
         self.lines = []
         self.line = None
-        self.patch = None
         self.disconnect()
         
     def disconnect(self):
@@ -169,12 +185,16 @@ class ROI(object):
         self.fig.canvas.mpl_disconnect(self.events[0])
         self.fig.canvas.mpl_disconnect(self.events[1])
 
-class ROIcircle(ROI):
+class ROIcircle(ROI):    
     def __init__(self, im, ax, fig, completion_callback=None):
         self.circ = None    
         self.im = im.get_size()
         self.fig =  fig
         self.type = 'circ'
+        self.axes = ax
+        # preserve these so that we can blow away the self.circ object as needed
+        self.radius = None
+        self.center = None
         
         self.fig.canvas.draw()
         cid1 = fig.canvas.mpl_connect('motion_notify_event', self.motion_notify_callback)
@@ -183,11 +203,21 @@ class ROIcircle(ROI):
         self.completion_callback = completion_callback
 
     def __getstate__(self):
-        return {'im':self.im, 'circle':(self.circ.center, self.circ.radius)}
+        return {'im':self.im, 'circle':(self.center, self.radius)}
 
     def __setstate__(self, d):
         self.im = d['im']
-        self.circ = plt.Circle(*d['circle'], facecolor='none', edgecolor='b')
+        self.center, self.radius = d['circle']
+        self.circ = plt.Circle(*d['circle'], facecolor='none', edgecolor='r')
+        
+    def draw(self):
+        mycirc=plt.Circle(self.center,self.radius,color='r')
+        mycirc.set_linewidth(1)
+        mycirc.set_alpha(1)
+        mycirc.set_edgecolor('r')
+        mycirc.set_facecolor('none')
+        self.circ = self.axes.add_artist(mycirc)
+        self.fig.canvas.draw()
         
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -200,8 +230,8 @@ class ROIcircle(ROI):
             
             if event.button == None and self.circ != None: # Move line around 
                 x0, y0 = self.circ.center
-                r = ((x0-x)**2 + (y0-y)**2)**0.5
-                self.circ.set_radius(r)
+                self.radius = ((x0-x)**2 + (y0-y)**2)**0.5
+                self.circ.set_radius(self.radius)
                 self.fig.canvas.draw()
         
     def button_press_callback(self, event):
@@ -209,17 +239,20 @@ class ROIcircle(ROI):
         right button: fill polygon and stop interaction.
         """
         if event.inaxes: 
-            x, y = event.xdata, event.ydata
+            self.center = event.xdata, event.ydata
             ax = event.inaxes
             
             if event.button == 1:  # If you press the left button
                 if self.circ == None: # if there is no line, create a line
-                    self.circ = plt.Circle((x,y), 0.5, facecolor='none', edgecolor='b')
+                    self.circ = plt.Circle(self.center, 0.5, facecolor='none', edgecolor='r')
                     ax.add_artist(self.circ)     
                 # add a segment
                 else: # if there is a line, create a segment
-                    self.circ.set_color('b')
-                    self.circ.set_alpha(0.3)
+                    self.circ.set_color('r')
+                    self.circ.set_edgecolor('r')
+                    self.circ.set_facecolor('none')
+                    self.circ.set_linewidth(1)
+                    self.circ.set_alpha(1)
                     self.completion_callback()
                     self.disconnect()
 
@@ -247,16 +280,26 @@ class ROIcircle(ROI):
         """Take ROI polygon/lines off the image."""
         if self.circ:
             self.circ.remove()
+            self.circ = None
         self.disconnect()
 
-class ROIellipse(ROIcircle): 
+class ROIellipse(ROIcircle):      
     def __getstate__(self):
-        return {'im':self.im, 'circle':(self.circ.center, self.circ.width,
-                                        self.circ.height)}
+        return {'im':self.im, 'circle':(self.center, self.width, self.height)}
 
     def __setstate__(self, d):
         self.im = d['im']
-        self.circ = Ellipse(*d['circle'], facecolor='none', edgecolor='b')
+        self.center, self.width, self.height = d['circle']
+        self.circ = Ellipse(*d['circle'], facecolor='none', edgecolor='r')
+        
+    def draw(self):
+        mycirc = Ellipse(self.center, self.width, self.height, facecolor='none', edgecolor='r')
+        mycirc.set_linewidth(1)
+        mycirc.set_alpha(1)
+        mycirc.set_edgecolor('r')
+        mycirc.set_facecolor('none')
+        self.circ = self.axes.add_artist(mycirc)
+        self.fig.canvas.draw()
 
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -267,7 +310,7 @@ class ROIellipse(ROIcircle):
             ax = event.inaxes
             x, y = event.xdata, event.ydata
             
-            if event.button == None and self.circ != None: # Move line around 
+            if event.button == None and self.circ is not None: # Move line around 
                 x0, y0 = self.circ.center
                 self.circ.height = abs(y-y0)*2
                 self.circ.width = abs(x-x0)*2
@@ -278,21 +321,26 @@ class ROIellipse(ROIcircle):
         right button: fill polygon and stop interaction.
         """
         if event.inaxes: 
-            x, y = event.xdata, event.ydata
+            self.center = event.xdata, event.ydata
             ax = event.inaxes
             
             if event.button == 1:  # If you press the left button
                 if self.circ == None: 
-                    self.circ = Ellipse((x,y), 0.5, 0.5, facecolor='none', edgecolor='b')
+                    self.circ = Ellipse(self.center, 0.5, 0.5, facecolor='none', edgecolor='r')
                     ax.add_artist(self.circ)
                 else: 
-                    self.circ.set_color('b')
-                    self.circ.set_alpha(0.3)
+                    self.circ.set_color('r')
+                    self.circ.set_edgecolor('r')
+                    self.circ.set_facecolor('none')
+                    self.circ.set_linewidth(1)
+                    self.circ.set_alpha(1)
                     self.disconnect()
+                    
+                    self.height = self.circ.height
+                    self.width = self.circ.width
                     self.completion_callback()
-
-            elif event.button == 3 and self.circ != None: # middle button: remove last segment
-                self.circ.remove()
+            elif event.button == 3 and self.circ is not None: # middle button: remove last segment
+                self.circ.remove()                
                 self.circ = None
             self.fig.canvas.draw()
 
@@ -327,24 +375,3 @@ def new_ROI(image, axis, figure, shape='polygon', completion_callback=None):
     else:
         raise ValueError("that is not a valid ROI shape")
     return cursor
-
-def draw_ROI(roi, axes, figure):
-    if axes is None:
-        axes = plt.gca()
-    
-    """Draw the ROI on an image"""
-    if hasattr(roi, 'xcoords'):  #it's a polygon     
-        poly=plt.Polygon(zip(roi.xcoords,roi.ycoords))
-        poly.set_linewidth(1)
-        poly.set_alpha(1)
-        poly.set_edgecolor('r')
-        poly.set_facecolor('none')
-        roi.patch = axes.add_patch(poly)       
-    elif hasattr(roi, 'circ'):  #it's a circle   
-        mycirc=plt.Circle(roi.circ.center,roi.circ.radius,color='r')
-        mycirc.set_linewidth(1)
-        mycirc.set_alpha(1)
-        mycirc.set_edgecolor('r')
-        mycirc.set_facecolor('none')
-        roi.patch = axes.add_artist(mycirc)
-    figure.canvas.draw()
