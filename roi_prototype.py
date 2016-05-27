@@ -202,8 +202,6 @@ class MainWindow(QtGui.QWidget):
     def clear_roi(self):        
         # remove the ROI from the screen, but do not delete it until it is
         # overwritten by another ROI
-        print "None test"
-        print "object: {}, is not none: {}".format(self.activeROI, self.activeROI is not None)
         if self.activeROI is not None: # check if there is an ROI
             self.activeROI.remove()
             self.activeROI.disconnect()
@@ -254,8 +252,6 @@ class MainWindow(QtGui.QWidget):
                 self.image_ROIs[self.image_filename] = self.activeROI
         else:
             self.image_ROIs[self.image_filename] = self.activeROI
-            
-        pprint(self.image_ROIs)
         
     def get_roi_scope(self):
         return self.combo_roi_scope.currentText()

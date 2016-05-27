@@ -175,11 +175,12 @@ class ROIcircle(ROI):
         self.im = im.get_size()
         self.fig =  fig
         self.type = 'circ'
+        
         self.fig.canvas.draw()
         cid1 = fig.canvas.mpl_connect('motion_notify_event', self.motion_notify_callback)
         cid2 = fig.canvas.mpl_connect('button_press_event', self.button_press_callback)
         self.events = cid1,cid2
-        self.completion_callback = None
+        self.completion_callback = completion_callback
 
     def __getstate__(self):
         return {'im':self.im, 'circle':(self.circ.center, self.circ.radius)}
@@ -214,14 +215,13 @@ class ROIcircle(ROI):
             if event.button == 1:  # If you press the left button
                 if self.circ == None: # if there is no line, create a line
                     self.circ = plt.Circle((x,y), 0.5, facecolor='none', edgecolor='b')
-                    ax.add_artist(self.circ)
-                    
+                    ax.add_artist(self.circ)     
                 # add a segment
                 else: # if there is a line, create a segment
                     self.circ.set_color('b')
                     self.circ.set_alpha(0.3)
-                    self.disconnect()
                     self.completion_callback()
+                    self.disconnect()
 
             elif event.button == 3 and self.circ != None: # middle button: remove last segment
                 # ax.artists.remove(self.circ)
@@ -247,7 +247,6 @@ class ROIcircle(ROI):
         """Take ROI polygon/lines off the image."""
         if self.circ:
             self.circ.remove()
-            self.circ = None
         self.disconnect()
 
 class ROIellipse(ROIcircle): 
@@ -340,12 +339,12 @@ def draw_ROI(roi, axes, figure):
         poly.set_alpha(1)
         poly.set_edgecolor('r')
         poly.set_facecolor('none')
-        axes.add_patch(poly)       
+        roi.patch = axes.add_patch(poly)       
     elif hasattr(roi, 'circ'):  #it's a circle   
         mycirc=plt.Circle(roi.circ.center,roi.circ.radius,color='r')
         mycirc.set_linewidth(1)
         mycirc.set_alpha(1)
         mycirc.set_edgecolor('r')
         mycirc.set_facecolor('none')
-        axes.add_artist(mycirc)
+        roi.patch = axes.add_artist(mycirc)
     figure.canvas.draw()
