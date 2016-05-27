@@ -57,14 +57,14 @@ class ROI(object):
         self.xcoords = d['xcoords']
         self.ycoords= d['ycoords']
         
-    def draw(self):
+    def draw(self, axes, figure):
         poly=plt.Polygon(zip(self.xcoords,self.ycoords))
         poly.set_linewidth(1)
         poly.set_alpha(1)
         poly.set_edgecolor('r')
         poly.set_facecolor('none')
-        self.patch = self.axes.add_patch(poly)
-        self.fig.canvas.draw()
+        self.patch = axes.add_patch(poly)
+        figure.canvas.draw()
         
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -166,7 +166,6 @@ class ROI(object):
         
     def remove(self):
         """Take ROI polygon/lines off the image."""   
-        
         for l in self.lines:
             l.remove()
         if self.patch is not None:
@@ -175,7 +174,9 @@ class ROI(object):
             
         self.lines = []
         self.line = None
-        self.disconnect()
+        # disconnecting is not necessary if this was a previously pickled ROI
+        if hasattr(self, 'fig'):
+            self.disconnect()
         
     def disconnect(self):
         """Remove interaction, which by default persists even when the
@@ -210,14 +211,14 @@ class ROIcircle(ROI):
         self.center, self.radius = d['circle']
         self.circ = plt.Circle(*d['circle'], facecolor='none', edgecolor='r')
         
-    def draw(self):
+    def draw(self, axes, figure):
         mycirc=plt.Circle(self.center,self.radius,color='r')
         mycirc.set_linewidth(1)
         mycirc.set_alpha(1)
         mycirc.set_edgecolor('r')
         mycirc.set_facecolor('none')
-        self.circ = self.axes.add_artist(mycirc)
-        self.fig.canvas.draw()
+        self.circ = axes.add_artist(mycirc)
+        figure.canvas.draw()
         
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -282,7 +283,8 @@ class ROIcircle(ROI):
         if self.circ:
             self.circ.remove()
             self.circ = None
-        self.disconnect()
+        if hasattr(self, 'fig'):
+            self.disconnect()
 
 class ROIellipse(ROIcircle):      
     def __getstate__(self):
@@ -293,14 +295,14 @@ class ROIellipse(ROIcircle):
         self.center, self.width, self.height = d['circle']
         self.circ = Ellipse(*d['circle'], facecolor='none', edgecolor='r')
         
-    def draw(self):
+    def draw(self, axes, figure):
         mycirc = Ellipse(self.center, self.width, self.height, facecolor='none', edgecolor='r')
         mycirc.set_linewidth(1)
         mycirc.set_alpha(1)
         mycirc.set_edgecolor('r')
         mycirc.set_facecolor('none')
-        self.circ = self.axes.add_artist(mycirc)
-        self.fig.canvas.draw()
+        self.circ = axes.add_artist(mycirc)
+        figure.canvas.draw()
 
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer

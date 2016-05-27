@@ -70,9 +70,7 @@ class ROISelectPlot(QtGui.QWidget):
         
     @QTSlotExceptionRationalizer("bool")
     def make_image(self, im, image_roi=None):
-        self.axes.clear()
-        # todo add ROI loading mechanism
-        
+        self.axes.clear()        
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
         self.axes.set_autoscale_on(True)
         self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, 5),vmax=np.percentile(im, 95), cmap='gray', origin='image')
@@ -119,6 +117,7 @@ class MainWindow(QtGui.QWidget):
         self.image_ROIs = {}
         self.image_filename_list = []
         self.activeROI = None
+        self.roi_path = None
 
     @QTSlotExceptionRationalizer("bool")
     def init_gui(self):
@@ -241,17 +240,17 @@ class MainWindow(QtGui.QWidget):
         self.slice_label.setText("{}/{}".format(num, demon))
     
     @QTSlotExceptionRationalizer("bool")
-    def roi_complete_callback(self):
-        print "ROI complete callback called"      
+    def roi_complete_callback(self):      
         roi_scope = self.get_roi_scope()       
         
-        print roi_scope
-        print self.image_filename_list        
         if roi_scope == "All Slices":
             for img_fn in self.image_filename_list:
                 self.image_ROIs[img_fn] = self.activeROI
         else:
             self.image_ROIs[self.image_filename] = self.activeROI
+        # save ROI files
+        with open(self.roi_path, 'w') as f:
+            cPickle.dump(self.image_ROIs, f)
         
     def get_roi_scope(self):
         return self.combo_roi_scope.currentText()
@@ -276,10 +275,14 @@ class MainWindow(QtGui.QWidget):
 
             self.image_filename = self.image_filename_list[self.image_index]
             self.plot_im.make_image(self.images[self.image_index])
-            self.load_roi()
             num, demon = '01', str(len(self.images)).rjust(2, '0')
             self.slice_label.setText("{}/{}".format(num, demon))
             
+            # load image ROIs if possible
+            if os.path.isfile(self.roi_path):
+                with open(self.roi_path, 'r') as f:
+                    self.image_ROIs = cPickle.load(f)
+            self.load_roi()
         else: # user hit the cancel or x button to leave the dialog
             pass
     
@@ -287,7 +290,7 @@ class MainWindow(QtGui.QWidget):
     def load_roi(self):
         if self.image_filename in self.image_ROIs:
             self.activeROI = self.image_ROIs[self.image_filename]
-            self.activeROI.draw()
+            self.activeROI.draw(self.plot_im.axes, self.plot_im.figure)
     
     @QTSlotExceptionRationalizer("bool")
     def start_roi(self):
@@ -308,7 +311,6 @@ class MainWindow(QtGui.QWidget):
     def process_data(self, event):
         # todo add error message if images or ROI not loaded
         relaxation_type = self.get_relax_type()         
-        roi = self.plot_im.get_roi()
         relax = self.combo_relax.currentText()
         # todo - implement this method
         
@@ -325,7 +327,7 @@ class MainWindow(QtGui.QWidget):
         else:
             raise NotImplementedError("This mapping type's fitting algorithm has not been implemented yet") 
             
-def make_T2_fit_from_directory_and_roi(dicom_directory, images, roi):
+def make_T2_fit_from_directory_and_roi(dicom_directory, images, roi_list):
     """Simplest case: makes a T2 monoexponential fit given a directory of T2 
     DICOMs and a single ROI mask.
     """
@@ -339,11 +341,14 @@ def make_T2_fit_from_directory_and_roi(dicom_directory, images, roi):
     else:
         prep_times = VE17_prep_times
     
-    mean_signal_magnitude = blood_tools.calc_ROI_mean(roi, images)
+    signal = []
+    for image, roi in zip(images, roi_list):
+        mean_signal_magnitude = blood_tools.calc_ROI_mean(roi, images)
+        signal.append(mean_signal_magnitude)
     
     print "Prep times: {}".format(prep_times)
     print "T2 signal intensities: {}".format(mean_signal_magnitude)    
-    return prep_times, mean_signal_magnitude
+    return prep_times, signal
 
 def main():
     app = QtGui.QApplication.instance() or QtGui.QApplication([])
