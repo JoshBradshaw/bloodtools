@@ -59,7 +59,7 @@ class ROISelectPlot(QtGui.QWidget):
         super(ROISelectPlot, self).__init__(parent)
         # initialize the plot area        
         self.figure = Figure()
-        self.axes = self.figure.add_subplot(111, autoscale_on=True)
+        self.axes = self.figure.add_subplot(111, autoscale_on=False)
         self.canvas = FigureCanvas(self.figure)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
         # set the layout
@@ -75,10 +75,9 @@ class ROISelectPlot(QtGui.QWidget):
         
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
         self.axes.set_autoscale_on(True)
-        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, 5),vmax=np.percentile(im, 95), cmap='gray')
-        
-        self.figure.canvas.draw()
+        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, 5),vmax=np.percentile(im, 95), cmap='gray', origin='image')
         self.axes.set_autoscale_on(False)
+        self.figure.canvas.draw()
         
     def get_axes(self):
         return self.axes
@@ -98,7 +97,7 @@ class T2CurvePlot(QtGui.QWidget):
     def __init__(self, parent=None):
         super(T2CurvePlot, self).__init__(parent)
         self.figure = Figure()
-        self.axes = self.figure.add_subplot(111, autoscale_on=True)
+        self.axes = self.figure.add_subplot(111, autoscale_on=False)
         self.canvas = FigureCanvas(self.figure)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
         # set the layout

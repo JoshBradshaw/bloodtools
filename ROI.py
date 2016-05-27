@@ -239,12 +239,13 @@ class ROIcircle(ROI):
         right button: fill polygon and stop interaction.
         """
         if event.inaxes: 
-            self.center = event.xdata, event.ydata
+            x, y = event.xdata, event.ydata
             ax = event.inaxes
             
             if event.button == 1:  # If you press the left button
                 if self.circ == None: # if there is no line, create a line
-                    self.circ = plt.Circle(self.center, 0.5, facecolor='none', edgecolor='r')
+                    self.center = x, y
+                    self.circ = plt.Circle((x, y), 0.5, facecolor='none', edgecolor='r')
                     ax.add_artist(self.circ)     
                 # add a segment
                 else: # if there is a line, create a segment
@@ -321,12 +322,13 @@ class ROIellipse(ROIcircle):
         right button: fill polygon and stop interaction.
         """
         if event.inaxes: 
-            self.center = event.xdata, event.ydata
+            x, y = event.xdata, event.ydata
             ax = event.inaxes
             
             if event.button == 1:  # If you press the left button
                 if self.circ == None: 
-                    self.circ = Ellipse(self.center, 0.5, 0.5, facecolor='none', edgecolor='r')
+                    self.circ = Ellipse((x, y), 0.5, 0.5, facecolor='none', edgecolor='r')
+                    self.center = x, y                    
                     ax.add_artist(self.circ)
                 else: 
                     self.circ.set_color('r')
