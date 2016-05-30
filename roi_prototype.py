@@ -5,20 +5,24 @@ Created on Tue May 24 13:09:08 2016
 
 @author: Josh
 """
+
+# std lib imports
 import os
-from PyQt4 import QtGui, QtCore
-import qtawesome
 import traceback
 import types
 from functools import wraps
+import cPickle
+import math
+# anaconda module imports
+from PyQt4 import QtGui, QtCore
+import qtawesome
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT
 from matplotlib.figure import Figure
+import numpy as np
+# other python files that should be in the same dir
 import ROI
 import blood_tools
-import numpy as np
-import cPickle
-from pprint import pprint
-import math
+import fitting
 
 def QTSlotExceptionRationalizer(*args):
     """
@@ -97,7 +101,7 @@ class T2CurvePlot(QtGui.QWidget):
     def __init__(self, parent=None):
         super(T2CurvePlot, self).__init__(parent)
         self.figure = Figure()
-        self.axes = self.figure.add_subplot(111, autoscale_on=False)
+        self.axes = self.figure.add_subplot(111, autoscale_on=True)
         self.canvas = FigureCanvas(self.figure)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
         # set the layout
@@ -272,7 +276,7 @@ class MainWindow(QtGui.QWidget):
             self.clear_roi()
             self.directory = out
             self.roi_path = os.path.join(self.directory, '.ROIs')
-            self.images, self.image_attributes, self.dicom_list = blood_tools.read_dicoms(out,[])
+            self.images, self.image_attributes, self.dicom_list = blood_tools.read_dicoms(out, ['InversionTime'])
             
             for attributes in self.image_attributes:
                 self.image_filename_list.append(attributes['filename'])
@@ -317,18 +321,33 @@ class MainWindow(QtGui.QWidget):
     def process_data(self, event):
         # todo add error message if images or ROI not loaded
         axes = self.plot_graph.axes
-        relaxation_type = self.get_relax_type()         
-        relax = self.combo_relax.currentText()
-        # todo - implement this method
-        
+        relaxation_type = self.get_relax_type()      
+        roi_list = [self.image_ROIs[img_fn] for img_fn in self.image_filename_list]
+
         if relaxation_type == 'T1':
-            raise NotImplementedError("T1 mapping has not been implemented yet")            
+            ti, signal = get_T1_decay_signal(self.image_attributes, self.images, roi_list, log_scale=False)
+            axes.plot(ti, signal, 'ro')
+            axes.set_xlabel('inversion time (ms)')
+            axes.set_ylabel('signal intensity')
+            
+            inversion_recovery = fitting.model('abs(M0*(1-2*aa*exp(-x/T1)))', {'M0':signal.max(),'aa':1,'T1':1000}) 
+            #Initial T1 guess based on null time    
+            T1_guess=-ti[np.where(signal==signal.min())]/np.log(0.5) 
+            if(np.size(T1_guess)>1):
+                inversion_recovery['T1']=T1_guess[0]
+            else:
+                inversion_recovery['T1']=T1_guess  
+                
+            inversion_recovery.fit(ti, signal)
+            fix_x_points=np.arange(0,20000,1)
+            axes.plot(fix_x_points,inversion_recovery(fix_x_points))          
+            T1_corr=inversion_recovery['T1'].value*(2*inversion_recovery['aa'].value-1)
+            axes.text(0.7, 0.7, "T1 Value: {}ms".format(round(T1_corr)), transform=axes.transAxes)
         elif relaxation_type == 'T2':    
-            roi_list = [self.image_ROIs[img_fn] for img_fn in self.image_filename_list]
             x, y = get_T2_decay_signal(self.dicom_list, self.images, roi_list)
             axes.clear()
             axes.plot(x, y, 'ro')
-            axes.set_xlabel('time (ms)')
+            axes.set_xlabel('TE time (ms)')
             axes.set_ylabel('log(signal intensity)')
                         
             first_coeff, zeroth_coeff = np.polyfit(x, y, 1)
@@ -338,13 +357,10 @@ class MainWindow(QtGui.QWidget):
             axes.plot(fit_x_points, fit_y_points, 'b-')
             t2_value = -1*(fit_x_points[-1] - fit_x_points[0])/(fit_y_points[-1] - fit_y_points[0])
             axes.text(0.7, 0.7, "T2 Value: {}ms".format(round(t2_value)), transform=axes.transAxes)
-            self.plot_graph.figure.canvas.draw()
-            
-            #x, y, parameters = make_fit_from_data(x, y, relax)
-            #self.plot_graph.axes.plot(x, y, 'r-')
-            #self.plot_graph.axes.figure.text(figx, figy, parameters)
         else:
             raise NotImplementedError("This mapping type's fitting algorithm has not been implemented yet") 
+            
+        self.plot_graph.figure.canvas.draw()
             
 def get_T2_decay_signal(dicom_list, image_list, roi_list, log_scale=True):
     """Simplest case: makes a T2 monoexponential fit given a directory of T2 
@@ -374,6 +390,26 @@ def get_T2_decay_signal(dicom_list, image_list, roi_list, log_scale=True):
         return prep_times, log_signal
     else:
         return prep_times, signal
+        
+def get_T1_decay_signal(image_attributes, image_list, roi_list, log_scale=True):
+    """Simplest case: makes a T2 monoexponential fit given a directory of T2 
+    DICOMs and a single ROI mask.
+    """
+    inversion_times = np.array([att['InversionTime'] for att in image_attributes])   
+    signal = []
+    log_signal = []
+    for image, roi in zip(image_list, roi_list):
+        mean_signal_magnitude_over_ROI = blood_tools.calc_ROI_mean(roi, image)
+        signal.append(mean_signal_magnitude_over_ROI)
+        log_signal.append(math.log(mean_signal_magnitude_over_ROI))
+    
+    print "Inversion Times: {}".format(inversion_times)
+    print "T1 signal intensities: {}".format(log_signal)    
+    
+    if log_scale:
+        return inversion_times, np.array(log_signal)
+    else:
+        return inversion_times, np.array(signal)
 
 def main():
     app = QtGui.QApplication.instance() or QtGui.QApplication([])
