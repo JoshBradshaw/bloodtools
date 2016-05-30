@@ -21,7 +21,6 @@ def calc_ROI_mean(roi,images):
     """Calculate the mean of an ROI across a list of images"""
     if isinstance(images,list):
         mean=np.zeros(len(images))
-
         for jj in np.arange(len(images)):
             mean[jj]=images[jj][roi.get_indices()].mean()
     else:
@@ -32,26 +31,20 @@ def calc_ROI_serr(ROI,images):
     """Calculate the mean of an ROI across a list of images"""  
     if isinstance(images,list):
         serr=np.zeros(len(images))
-
         for jj in np.arange(len(images)):
             serr[jj]=images[jj][ROI.get_indices()].std()/np.sqrt(len(ROI.get_indices()[0]))           
-    
     else:
         serr=images[ROI.get_indices()].std()/np.sqrt(len(ROI.get_indices()[0]))       
-    
     return serr    
 
 def calc_ROI_std(ROI,images):
     """Calculate the mean of an ROI across a list of images"""  
     if isinstance(images,list):
         std=np.zeros(len(images))
-
         for jj in np.arange(len(images)):
             std[jj]=images[jj][ROI.get_indices()].std()          
-    
     else:
         std=images[ROI.get_indices()].std()
-    
     return std    
     
 def load_ROIs(filename):
@@ -68,28 +61,26 @@ def load_ROIs(filename):
 
 def read_dicoms(foldername, attributes=[]):
     """Read in all the dicom files in a folder and any necessary attributes"""   
-    
     file_list=os.listdir(foldername)
     file_list.sort()
     image_list=[]
+    dicom_list = []
     attribute_list=[]
-
-    for file_name in file_list:
-        dicom_read_success = True    
-        attribute_dict={}
-        
+    for file_name in file_list:    
+        attribute_dict={}    
         try:
-            image=dicom.read_file(os.path.join(foldername, file_name))
+            dicom_obj=dicom.read_file(os.path.join(foldername, file_name))
+            dicom_list.append(dicom_obj)
         except dicom.filereader.InvalidDicomError:
             print "Error, invalid dicom file: {}".format(os.path.join(foldername, file_name))
             continue            
             
-        image_list.append(image.pixel_array)
+        image_list.append(dicom_obj.pixel_array)
         attribute_dict['filename'] = file_name
         for item in attributes:
-            attribute_dict[item]=getattr(image,item,0)       
+            attribute_dict[item]=getattr(dicom_obj,item,0)       
         attribute_list.append(attribute_dict)
-    return image_list, attribute_list       
+    return image_list, attribute_list, dicom_list     
 
 def img_roi_signal(folders_to_process,attributes=[]):
     """Function to return an array with the mean and std of the signal
@@ -97,12 +88,10 @@ def img_roi_signal(folders_to_process,attributes=[]):
     for each image within each folder. If attribute is not null function
     will also provide the value of the attribute (e.g. echo time) for 
     each image"""
-    
     folder_image_list=[]
     roi_list=[]
     attribute_lists=[]
     max_images=0
-    
 
     for ii,folder in enumerate(folders_to_process):
         image_list,attribute_list=read_dicoms(folder,attributes)
@@ -118,17 +107,14 @@ def img_roi_signal(folders_to_process,attributes=[]):
             sys.exit(1)
         roi_list.append(rois)
         max_images=np.max([max_images,len(image_list)])
-        
     
     mean_signal_mat=np.zeros([len(folders_to_process),len(rois),max_images])
     serr_signal_mat=np.zeros([len(folders_to_process),len(rois),max_images])
     
     for ii,images in enumerate(folder_image_list):      
-        
         for jj,roi in enumerate(roi_list[ii]):
             mean_signal_mat[ii,jj,0:len(images)]=calc_ROI_mean(roi,images)
             serr_signal_mat[ii,jj,0:len(images)]=calc_ROI_serr(roi,images)
-        
     return roi_list, folder_image_list, attribute_lists, mean_signal_mat, serr_signal_mat        
 
 def SE_fit_new(te, signal, mean_noise=0, noise_floor='n', noise_factor=2):
@@ -163,10 +149,8 @@ def SE_fit_new(te, signal, mean_noise=0, noise_floor='n', noise_factor=2):
 #        spin_echo['a'].freeze()        
         spin_echo.fit(te,signal) 
         #ci=spin_echo.conf(sigma=1) 
-    
     return spin_echo
 
-    
 def T2_cpmg_process(folder_to_process,plot='y'):
     """Given a folder of images will process cpmg data and return
     fitted T2 values and associated uncertainties"""
@@ -196,7 +180,6 @@ def T2_cpmg_process(folder_to_process,plot='y'):
             print 'RuntimeError'
             spin_echo=fitting.model('M0*exp(-x/T2)+a',{'M0':0,'T2':0,'a':0}) 
             spin_echo_fits.append(spin_echo)
-         
     return spin_echo_fits   
     
 def read_bga(filename):
@@ -235,9 +218,7 @@ def IR_fit(ti,signal,serr_signal=[]):
     inversion_recovery.fit(np.array(ti),signal,serr_signal)  
     chi2=inversion_recovery.chi2()
     print chi2
-            
     return inversion_recovery
-
     
 def IR_process(folders_to_process):
     """Calculates T1s given a list of folders, each corresponding to an individual TI"""
@@ -363,7 +344,6 @@ def check_T1_chi_surface(folders_to_process, sample):
     aas=np.arange(0.9,1.1,0.001)
     chi_surf=fit.contours(fit['T1'],fit['aa'],T1s,aas)
     return T1s, aas, chi_surf    
-    
           
 def make_case_report_csv(T2_dict,T1_dict,filename):
     book = xlwt.Workbook(encoding="utf-8")  
@@ -400,8 +380,7 @@ def make_case_report_csv(T2_dict,T1_dict,filename):
         sheet1.write(jj+1,3,T1_value)
         for kk in np.arange(len(taus)):
             sheet1.write(jj+1,4+kk,T2_value_list[indices[kk]].nominal_value)
-    book.save(filename)  
-    
+    book.save(filename)     
     
 def make_T2_report_csv(T2_dict_list,filename):
     book = xlwt.Workbook(encoding="utf-8")  
@@ -434,7 +413,6 @@ def make_T2_report_csv(T2_dict_list,filename):
             for mm in np.arange(len(taus)):
                 sheet1.write(kk+1,4+mm,T2_value_list[indices[mm]].nominal_value)
     book.save(filename)      
-       
             
 def calc_B0_map(folder,roi_mask):
     from human_SWI_data import phase_rescale
@@ -541,8 +519,7 @@ def T1_MOLLI_bootstrap_everyTI(folder,N=1000):
             #T1bs.append(fit['T1'].value)
         T1s.append(np.mean(T1bs))
         T1_errs.append(np.std(T1bs))
-    return T1s, T1_errs     
-    
+    return T1s, T1_errs
     
 def plot_T2_contour(esp, model):
     """Given a model (defined according to fitting.py) will plot constant sO2 contours as a function of Hct for 
@@ -561,7 +538,6 @@ def plot_T2_contour(esp, model):
     C = plt.contour(Hct_mat,1000/R2_ans,100*sO2_mat,np.r_[0:40:20,30:110:10],vmin=0,vmax=110,linewidths=1.5,linestyles='solid',cmap=matplotlib.cm.cool)      
     plt.clabel(C, C.levels[::2], colors='k', inline=True, fmt="%0.1f", fontsize=14)                 
 
-
 def plot_T1_contour(model,metHb=0.005):
     """Given a model (defined according to fitting.py) will plot constant sO2 contours as a function of Hct for 
     a given esp (in seconds)""" 
@@ -579,7 +555,6 @@ def plot_T1_contour(model,metHb=0.005):
     C = plt.contour(100*sO2_mat,1000/R1_ans,Hct_mat,np.r_[0:0.3:0.05,0.3:1.1:0.1],vmin=0,vmax=0.95,linewidths=1.5,cmap=matplotlib.cm.jet)  
     #C = plt.contour(Hct_mat,1000/R1_ans,sO2_mat,np.arange(-0.5,1.05,0.05),vmin=0,vmax=1.1,linewidths=1.5,cmap=matplotlib.cm.cool)     
     plt.clabel(C, C.levels[::2], colors='k', inline=True, fmt="%0.2f", fontsize=14)     
-
 
 def retrieve_dict_data(T2_dict, esp=0, metHb_threshold=0.02):
     R2s=[]
@@ -660,41 +635,38 @@ def calc_R2(x,a1,a2,a3,b1,b2,c1):
     R2=(a1+a2*x[0]+a3*x[0]**2) + (b1*x[0]+b2*x[0]**2)*(1-x[1]) + (c1*x[0]*(1-x[0]))*(1-x[1])**2      
     return R2
     
-def get_T2_prep_times_VB17(foldername):
-    file_list=os.listdir(foldername)
-    dicom_filename = foldername +'/' + file_list[0]
-    hdr=dicom.read_file(dicom_filename)
-    out=(hdr[(0x0029,0x1020)])    
-    pat='sWiPMemBlock.alFree\[2\][ ]+=[ ]([.\d]+)'
+def get_T2_prep_times_VB17(dicom_list):
+    prep_times_re = r'sWiPMemBlock.alFree\[2\][ ]+=[ ]([.\d]+)'
+    prep_times_value_re = r'sWiPMemBlock.adFree\[\d+\][ ]+=[ ]([.\d]+)'
     
-    if not re.findall(pat,str(out.value)):
-        return []        
+    for dicom_hdr in dicom_list:    
+        out=(dicom_hdr[(0x0029,0x1020)])    
+        prep_time_search = re.findall(prep_times_re,str(out.value))     
         
-    num_preps=int(re.findall(pat,str(out.value))[0])    
-    pat='sWiPMemBlock.adFree\[\d+\][ ]+=[ ]([.\d]+)'
-    value_list=re.findall(pat, str(out.value))[0:num_preps]
-    prep_times=[float(prep_time)-0.001 for prep_time in value_list]
-    return prep_times
+        if not prep_time_search:
+            return []   
+        else:
+            num_preps=int(prep_time_search[0]) 
+            value_list=re.findall(prep_times_value_re, str(out.value))[0:num_preps]
+            prep_times=[float(prep_time)-0.001 for prep_time in value_list]
+            return prep_times
     
-def get_T2_prep_times_VE11(foldername):
-    file_list=os.listdir(foldername)
-    dicom_filename = foldername +'/' + file_list[0]
-    hdr=dicom.read_file(dicom_filename)
-    out=repr(hdr[(0x0029,0x1020)].value)
-    out=out.replace('\\t',' ')
-    out=out.replace('\\n','\n')    
-    pat='sPrepPulses.adT2PrepDuration.__attribute__.size[ ]+=[ ]+([\d]+)'
-    if not re.findall(pat,out):
-        return []
+def get_T2_prep_times_VE11(dicom_list):
+    prep_times_re = r'sPrepPulses.adT2PrepDuration.__attribute__.size[ ]+=[ ]+([\d]+)'  
+    prep_times_value_re = r'sPrepPulses.adT2PrepDuration\[\d+\][ ]+=[ ]+([.\d]+)'
     
-    num_preps=int(re.findall(pat,out)[0])
-    
-    pat='sPrepPulses.adT2PrepDuration\[\d+\][ ]+=[ ]+([.\d]+)'
-    value_list=re.findall(pat, out)[0:num_preps]
-    prep_times=[float(prep_time)-0.001 for prep_time in value_list]
-    
-    return prep_times     
-    
+    for dicom_hdr in dicom_list:
+        out=repr(dicom_hdr[(0x0029,0x1020)].value)
+        out=out.replace('\\t',' ')
+        out=out.replace('\\n','\n')    
+        prep_time_search = re.findall(prep_times_re,out)
+        if not prep_time_search:
+            return []
+        else:
+            num_preps=int(prep_time_search[0])
+            value_list=re.findall(prep_times_value_re, out)[0:num_preps]
+            prep_times=[float(prep_time)-0.001 for prep_time in value_list]
+            return prep_times
     
 def plateau_detect(sig, slope_threshold=-5, factor=2):
     """To eliminate the noise floor from a subsequent T2 fit, returns the index

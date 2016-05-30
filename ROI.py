@@ -166,8 +166,9 @@ class ROI(object):
         
     def remove(self):
         """Take ROI polygon/lines off the image."""   
-        for l in self.lines:
-            l.remove()
+        if hasattr(self, 'lines'):
+            for l in self.lines:
+                l.remove()
         if self.patch is not None:
             self.patch.remove()
             self.patch = None
