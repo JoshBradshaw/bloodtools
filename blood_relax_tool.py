@@ -224,13 +224,7 @@ class MainWindow(QtGui.QWidget):
         # remove the ROI from the screen, but do not delete it until it is
         # overwritten by another ROI
         print "grey_roi: {}, color_roi: {}".format(self.grey_activeROI, self.color_activeROI)
-        
-        if self.grey_roi_patch is not None:        
-            self.grey_roi_patch.remove()
-        
-        if self.color_roi_patch is not None:
-            self.color_roi_patch.remove()
-        
+
         if self.color_activeROI is not None:
             self.color_activeROI.remove()
             axes = self.color_plot_im.get_axes()
@@ -243,6 +237,12 @@ class MainWindow(QtGui.QWidget):
             axes = self.plot_im.get_axes()
             axes = []
             self.grey_activeROI = None
+            
+        if self.grey_roi_patch is not None:        
+            self.grey_roi_patch.remove()
+        
+        if self.color_roi_patch is not None:
+            self.color_roi_patch.remove()
         
         grey_figure = self.plot_im.get_figure()
         grey_figure.canvas.draw()
@@ -360,8 +360,8 @@ class MainWindow(QtGui.QWidget):
         if self.image_filename in self.image_ROIs:
             self.grey_activeROI = self.image_ROIs[self.image_filename]
             self.color_activeROI = self.image_ROIs[self.image_filename]
-            self.grey_roi_patch = self.grey_activeROI.draw(self.plot_im.axes, self.plot_im.figure)
-            self.color_roi_patch = self.color_activeROI.draw(self.color_plot_im.axes, self.color_plot_im.figure)
+            self.grey_roi_patch = self.grey_activeROI.draw(self.plot_im.axes, self.plot_im.figure, 'red')
+            self.color_roi_patch = self.color_activeROI.draw(self.color_plot_im.axes, self.color_plot_im.figure, 'black')
     
     @QTSlotExceptionRationalizer("bool")
     def start_roi(self):
@@ -377,11 +377,11 @@ class MainWindow(QtGui.QWidget):
         # create an ROI object for both images, keep the one that calls the complete callback first
         self.grey_activeROI = ROI.new_ROI(self.plot_im.get_mpl_im(), 
             self.plot_im.get_axes(), self.plot_im.get_figure(), 
-            roi_style, self.grey_roi_complete_callback)
+            roi_style, 'red', self.grey_roi_complete_callback)
             
         self.color_activeROI = ROI.new_ROI(self.color_plot_im.get_mpl_im(), 
             self.color_plot_im.get_axes(), self.color_plot_im.get_figure(), 
-            roi_style, self.color_roi_complete_callback)
+            roi_style, 'black', self.color_roi_complete_callback)
         
     @QTSlotExceptionRationalizer("bool")
     def process_data(self, event):

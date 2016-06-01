@@ -24,7 +24,7 @@ class ROI(object):
     even if the image was removed).
     """
     
-    def __init__(self, im, ax, fig, completion_callback=None):
+    def __init__(self, im, ax, fig, color='r', completion_callback=None):
         """New ROI interactor.
         im: matplotlib image
         ax: axis it lives in
@@ -48,6 +48,7 @@ class ROI(object):
         cid2 = fig.canvas.mpl_connect('button_press_event', self.button_press_callback)
         self.events = cid1,cid2
         self.completion_callback = completion_callback
+        self.color = color
 
     def __getstate__(self):
         return {'im':self.im, 'xcoords':self.xcoords, 'ycoords':self.ycoords}
@@ -57,11 +58,11 @@ class ROI(object):
         self.xcoords = d['xcoords']
         self.ycoords= d['ycoords']
         
-    def draw(self, axes, figure):
+    def draw(self, axes, figure, color):
         poly=plt.Polygon(zip(self.xcoords,self.ycoords))
         poly.set_linewidth(2)
         poly.set_alpha(1)
-        poly.set_edgecolor('w')
+        poly.set_edgecolor(color)
         poly.set_facecolor('none')
         poly.set_hatch('//')
         self.patch = axes.add_patch(poly)
@@ -82,7 +83,7 @@ class ROI(object):
                                    [self.previous_point[1], y])      
                 self.fig.canvas.draw()
             elif event.button == 1: # Free Hand Drawing
-                    line = plt.Line2D([self.previous_point[0], x], [self.previous_point[1], y], color='w')                  
+                    line = plt.Line2D([self.previous_point[0], x], [self.previous_point[1], y], color=self.color)                  
   
                     ax.add_line(line)
                     self.lines.append(line)
@@ -100,7 +101,7 @@ class ROI(object):
             ax = event.inaxes
             if event.button == 1:  # If you press the left button
                 if self.line == None: # if there is no line, create a line
-                    self.line = plt.Line2D([x,  x],[y, y],marker = '.', color='w')
+                    self.line = plt.Line2D([x,  x],[y, y],marker = '.', color=self.color)
                     self.start_point = [x,y]
                     self.previous_point =  self.start_point 
                     ax.add_line(self.line)
@@ -111,7 +112,7 @@ class ROI(object):
                 # add a segment
                 else: # if there is a line, create a segment
                     self.line = plt.Line2D([self.previous_point[0], x], 
-                                       [self.previous_point[1], y], marker = '.', color='w')
+                                       [self.previous_point[1], y], marker = '.', color=self.color)
                     self.previous_point = [x,y]
                     event.inaxes.add_line(self.line)
                     self.lines.append(self.line)
@@ -190,7 +191,7 @@ class ROI(object):
         self.fig.canvas.mpl_disconnect(self.events[1])
 
 class ROIcircle(ROI):    
-    def __init__(self, im, ax, fig, completion_callback=None):
+    def __init__(self, im, ax, fig, color='r', completion_callback=None):
         self.circ = None    
         self.im = im.get_size()
         self.fig =  fig
@@ -205,6 +206,7 @@ class ROIcircle(ROI):
         cid2 = fig.canvas.mpl_connect('button_press_event', self.button_press_callback)
         self.events = cid1,cid2
         self.completion_callback = completion_callback
+        self.color = color
 
     def __getstate__(self):
         return {'im':self.im, 'circle':(self.center, self.radius)}
@@ -212,13 +214,13 @@ class ROIcircle(ROI):
     def __setstate__(self, d):
         self.im = d['im']
         self.center, self.radius = d['circle']
-        self.circ = plt.Circle(*d['circle'], facecolor='none', edgecolor='w')
+        self.circ = plt.Circle(*d['circle'], facecolor='none', edgecolor=self.color)
         
-    def draw(self, axes, figure):
-        mycirc=plt.Circle(self.center,self.radius,color='w')
+    def draw(self, axes, figure, color):
+        mycirc=plt.Circle(self.center,self.radius,color=color)
         mycirc.set_linewidth(2)
         mycirc.set_alpha(1)
-        mycirc.set_edgecolor('w')
+        mycirc.set_edgecolor(color)
         mycirc.set_facecolor('none')
         mycirc.set_hatch('//')
         self.circ = axes.add_artist(mycirc)
@@ -231,7 +233,6 @@ class ROIcircle(ROI):
         at each movement.
         """
         if event.inaxes: 
-            ax = event.inaxes
             x, y = event.xdata, event.ydata
             
             if event.button == None and self.circ != None: # Move line around 
@@ -251,12 +252,12 @@ class ROIcircle(ROI):
             if event.button == 1:  # If you press the left button
                 if self.circ == None: # if there is no line, create a line
                     self.center = x, y
-                    self.circ = plt.Circle((x, y), 0.5, facecolor='none', edgecolor='w')
+                    self.circ = plt.Circle((x, y), 0.5, facecolor='none', edgecolor=self.color)
                     ax.add_artist(self.circ)     
                 # add a segment
                 else: # if there is a line, create a segment
-                    self.circ.set_color('w')
-                    self.circ.set_edgecolor('w')
+                    self.circ.set_color(self.color)
+                    self.circ.set_edgecolor(self.color)
                     self.circ.set_facecolor('none')
                     self.circ.set_hatch('//')
                     self.circ.set_linewidth(2)
@@ -299,13 +300,12 @@ class ROIellipse(ROIcircle):
     def __setstate__(self, d):
         self.im = d['im']
         self.center, self.width, self.height = d['circle']
-        self.circ = Ellipse(*d['circle'], facecolor='none', edgecolor='w')
+        self.circ = Ellipse(*d['circle'], facecolor='none', edgecolor=self.color)
         
-    def draw(self, axes, figure):
-        mycirc = Ellipse(self.center, self.width, self.height, facecolor='none', edgecolor='w')
+    def draw(self, axes, figure, color):
+        mycirc = Ellipse(self.center, self.width, self.height, facecolor='none', edgecolor=color)
         mycirc.set_linewidth(2)
         mycirc.set_alpha(1)
-        mycirc.set_edgecolor('w')
         mycirc.set_facecolor('none')
         mycirc.set_hatch('//')
         self.circ = axes.add_artist(mycirc)
@@ -318,7 +318,6 @@ class ROIellipse(ROIcircle):
         at each movement.
         """
         if event.inaxes: 
-            ax = event.inaxes
             x, y = event.xdata, event.ydata
             
             if event.button == None and self.circ is not None: # Move line around 
@@ -337,12 +336,12 @@ class ROIellipse(ROIcircle):
             
             if event.button == 1:  # If you press the left button
                 if self.circ == None: 
-                    self.circ = Ellipse((x, y), 0.5, 0.5, facecolor='none', edgecolor='w')
+                    self.circ = Ellipse((x, y), 0.5, 0.5, facecolor='none', edgecolor=self.color)
                     self.center = x, y                    
                     ax.add_artist(self.circ)
                 else: 
-                    self.circ.set_color('w')
-                    self.circ.set_edgecolor('w')
+                    self.circ.set_color(self.color)
+                    self.circ.set_edgecolor(self.color)
                     self.circ.set_facecolor('none')
                     self.circ.set_linewidth(2)
                     self.circ.set_alpha(1)
@@ -371,18 +370,18 @@ class ROIellipse(ROIcircle):
         (x, y), w, h = coo
         return ellipse(y, x, h/2., w/2., self.im)
 
-def new_ROI(image, axis, figure, shape='polygon', completion_callback=None):
+def new_ROI(image, axis, figure, shape='polygon', color='r', completion_callback=None):
     """Set up an ROI picker and return it. This is the only way that the
     ROI class should be involked. Requires an input image (the thing
     returned by imshow), or can try the latest image in the current
     axes."""
     
     if shape=='polygon' or shape=='p':
-        cursor = ROI(image, axis, figure, completion_callback)
+        cursor = ROI(image, axis, figure, color, completion_callback)
     elif shape=='circle' or shape=='c':
-        cursor = ROIcircle(image, axis, figure, completion_callback)
+        cursor = ROIcircle(image, axis, figure, color, completion_callback)
     elif shape=='ellipse' or shape=='e':
-        cursor = ROIellipse(image, axis, figure, completion_callback)
+        cursor = ROIellipse(image, axis, figure, color, completion_callback)
     elif shape=='rectangle' or shape=='r':
         raise NotImplementedError("Rectangle ROI not yet created")
     else:
