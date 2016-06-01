@@ -40,7 +40,7 @@ class ROI(object):
         self.xcoords = []
         self.ycoords = [] 
         self.axes = ax
-        self.fig =  fig
+        self.fig = fig
         self.fig.canvas.draw()
         self.patch = None
         self.type = 'poly'
@@ -59,12 +59,14 @@ class ROI(object):
         
     def draw(self, axes, figure):
         poly=plt.Polygon(zip(self.xcoords,self.ycoords))
-        poly.set_linewidth(1)
+        poly.set_linewidth(2)
         poly.set_alpha(1)
-        poly.set_edgecolor('r')
+        poly.set_edgecolor('w')
         poly.set_facecolor('none')
+        poly.set_hatch('//')
         self.patch = axes.add_patch(poly)
         figure.canvas.draw()
+        return self.patch
         
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -80,7 +82,7 @@ class ROI(object):
                                    [self.previous_point[1], y])      
                 self.fig.canvas.draw()
             elif event.button == 1: # Free Hand Drawing
-                    line = plt.Line2D([self.previous_point[0], x], [self.previous_point[1], y], color='r')                  
+                    line = plt.Line2D([self.previous_point[0], x], [self.previous_point[1], y], color='w')                  
   
                     ax.add_line(line)
                     self.lines.append(line)
@@ -98,7 +100,7 @@ class ROI(object):
             ax = event.inaxes
             if event.button == 1:  # If you press the left button
                 if self.line == None: # if there is no line, create a line
-                    self.line = plt.Line2D([x,  x],[y, y],marker = '.', color='r')
+                    self.line = plt.Line2D([x,  x],[y, y],marker = '.', color='w')
                     self.start_point = [x,y]
                     self.previous_point =  self.start_point 
                     ax.add_line(self.line)
@@ -109,7 +111,7 @@ class ROI(object):
                 # add a segment
                 else: # if there is a line, create a segment
                     self.line = plt.Line2D([self.previous_point[0], x], 
-                                       [self.previous_point[1], y], marker = '.', color='r')
+                                       [self.previous_point[1], y], marker = '.', color='w')
                     self.previous_point = [x,y]
                     event.inaxes.add_line(self.line)
                     self.lines.append(self.line)
@@ -210,16 +212,18 @@ class ROIcircle(ROI):
     def __setstate__(self, d):
         self.im = d['im']
         self.center, self.radius = d['circle']
-        self.circ = plt.Circle(*d['circle'], facecolor='none', edgecolor='r')
+        self.circ = plt.Circle(*d['circle'], facecolor='none', edgecolor='w')
         
     def draw(self, axes, figure):
-        mycirc=plt.Circle(self.center,self.radius,color='r')
-        mycirc.set_linewidth(1)
+        mycirc=plt.Circle(self.center,self.radius,color='w')
+        mycirc.set_linewidth(2)
         mycirc.set_alpha(1)
-        mycirc.set_edgecolor('r')
+        mycirc.set_edgecolor('w')
         mycirc.set_facecolor('none')
+        mycirc.set_hatch('//')
         self.circ = axes.add_artist(mycirc)
         figure.canvas.draw()
+        return self.circ
         
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -247,14 +251,15 @@ class ROIcircle(ROI):
             if event.button == 1:  # If you press the left button
                 if self.circ == None: # if there is no line, create a line
                     self.center = x, y
-                    self.circ = plt.Circle((x, y), 0.5, facecolor='none', edgecolor='r')
+                    self.circ = plt.Circle((x, y), 0.5, facecolor='none', edgecolor='w')
                     ax.add_artist(self.circ)     
                 # add a segment
                 else: # if there is a line, create a segment
-                    self.circ.set_color('r')
-                    self.circ.set_edgecolor('r')
+                    self.circ.set_color('w')
+                    self.circ.set_edgecolor('w')
                     self.circ.set_facecolor('none')
-                    self.circ.set_linewidth(1)
+                    self.circ.set_hatch('//')
+                    self.circ.set_linewidth(2)
                     self.circ.set_alpha(1)
                     self.completion_callback()
                     self.disconnect()
@@ -294,16 +299,18 @@ class ROIellipse(ROIcircle):
     def __setstate__(self, d):
         self.im = d['im']
         self.center, self.width, self.height = d['circle']
-        self.circ = Ellipse(*d['circle'], facecolor='none', edgecolor='r')
+        self.circ = Ellipse(*d['circle'], facecolor='none', edgecolor='w')
         
     def draw(self, axes, figure):
-        mycirc = Ellipse(self.center, self.width, self.height, facecolor='none', edgecolor='r')
-        mycirc.set_linewidth(1)
+        mycirc = Ellipse(self.center, self.width, self.height, facecolor='none', edgecolor='w')
+        mycirc.set_linewidth(2)
         mycirc.set_alpha(1)
-        mycirc.set_edgecolor('r')
+        mycirc.set_edgecolor('w')
         mycirc.set_facecolor('none')
+        mycirc.set_hatch('//')
         self.circ = axes.add_artist(mycirc)
         figure.canvas.draw()
+        return self.circ
 
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -330,15 +337,16 @@ class ROIellipse(ROIcircle):
             
             if event.button == 1:  # If you press the left button
                 if self.circ == None: 
-                    self.circ = Ellipse((x, y), 0.5, 0.5, facecolor='none', edgecolor='r')
+                    self.circ = Ellipse((x, y), 0.5, 0.5, facecolor='none', edgecolor='w')
                     self.center = x, y                    
                     ax.add_artist(self.circ)
                 else: 
-                    self.circ.set_color('r')
-                    self.circ.set_edgecolor('r')
+                    self.circ.set_color('w')
+                    self.circ.set_edgecolor('w')
                     self.circ.set_facecolor('none')
-                    self.circ.set_linewidth(1)
+                    self.circ.set_linewidth(2)
                     self.circ.set_alpha(1)
+                    self.circ.set_hatch('//')
                     self.disconnect()
                     
                     self.height = self.circ.height
