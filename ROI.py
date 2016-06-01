@@ -60,7 +60,7 @@ class ROI(object):
         
     def draw(self, axes, figure, color):
         poly=plt.Polygon(zip(self.xcoords,self.ycoords))
-        poly.set_linewidth(2)
+        poly.set_linewidth(1)
         poly.set_alpha(1)
         poly.set_edgecolor(color)
         poly.set_facecolor('none')
@@ -218,7 +218,7 @@ class ROIcircle(ROI):
         
     def draw(self, axes, figure, color):
         mycirc=plt.Circle(self.center,self.radius,color=color)
-        mycirc.set_linewidth(2)
+        mycirc.set_linewidth(1)
         mycirc.set_alpha(1)
         mycirc.set_edgecolor(color)
         mycirc.set_facecolor('none')
@@ -260,7 +260,7 @@ class ROIcircle(ROI):
                     self.circ.set_edgecolor(self.color)
                     self.circ.set_facecolor('none')
                     self.circ.set_hatch('//')
-                    self.circ.set_linewidth(2)
+                    self.circ.set_linewidth(1)
                     self.circ.set_alpha(1)
                     self.completion_callback()
                     self.disconnect()
@@ -304,7 +304,7 @@ class ROIellipse(ROIcircle):
         
     def draw(self, axes, figure, color):
         mycirc = Ellipse(self.center, self.width, self.height, facecolor='none', edgecolor=color)
-        mycirc.set_linewidth(2)
+        mycirc.set_linewidth(1)
         mycirc.set_alpha(1)
         mycirc.set_facecolor('none')
         mycirc.set_hatch('//')
@@ -343,7 +343,7 @@ class ROIellipse(ROIcircle):
                     self.circ.set_color(self.color)
                     self.circ.set_edgecolor(self.color)
                     self.circ.set_facecolor('none')
-                    self.circ.set_linewidth(2)
+                    self.circ.set_linewidth(1)
                     self.circ.set_alpha(1)
                     self.circ.set_hatch('//')
                     self.disconnect()

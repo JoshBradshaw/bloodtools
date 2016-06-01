@@ -75,11 +75,11 @@ class ROISelectPlot(QtGui.QWidget):
         self.setLayout(layout)
         
     @QTSlotExceptionRationalizer("bool")
-    def make_image(self, im, image_roi=None):
+    def make_image(self, im, vmin=5, vmax=95):
         self.axes.clear()        
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
         self.axes.set_autoscale_on(True)
-        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, 5),vmax=np.percentile(im, 95), cmap='gray', origin='image')
+        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='gray', origin='image')
         self.axes.set_autoscale_on(False)
         self.figure.canvas.draw()
         
@@ -97,11 +97,11 @@ class ColourROISelectPlot(ROISelectPlot):
     Identical to ROI select plot, except colourized
     """
     @QTSlotExceptionRationalizer("bool")
-    def make_image(self, im, image_roi=None):
+    def make_image(self, im, vmin=5, vmax=95):
         self.axes.clear()        
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
         self.axes.set_autoscale_on(True)
-        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, 5),vmax=np.percentile(im, 95), cmap='jet', origin='image')
+        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='jet', origin='image')
         self.axes.set_autoscale_on(False)
         self.figure.canvas.draw()
 
@@ -139,6 +139,10 @@ class MainWindow(QtGui.QWidget):
         self.color_activeROI = None
         self.roi_path = None
         self.directory = ""
+        self.vmin = 5
+        self.vmax = 95
+        self.grey_roi_patch = None
+        self.color_roi_patch = None
 
     @QTSlotExceptionRationalizer("bool")
     def init_gui(self):
@@ -199,16 +203,31 @@ class MainWindow(QtGui.QWidget):
         layout_top.addWidget(combo_relax_label)
         layout_top.addWidget(self.combo_relax)
         layout_top.addWidget(button_run)
+        layout_top.addSpacing(10)
         
         layout_mid = QtGui.QHBoxLayout()
         layout_mid.addWidget(self.plot_im)
         layout_mid.addWidget(self.color_plot_im)
         layout_mid.addWidget(self.plot_graph)
-        layout_top.addSpacing(10)
+        
+        self.vmin_window_slider = QtGui.QSlider(orientation=QtCore.Qt.Horizontal)
+        self.vmin_window_slider.setValue(5)
+        self.vmax_window_slider = QtGui.QSlider(orientation=QtCore.Qt.Horizontal)
+        self.vmax_window_slider.setValue(95)
+        layout_slider1 = QtGui.QHBoxLayout()
+        layout_slider1.addWidget(QtGui.QLabel('Window Min:'))
+        layout_slider1.addSpacing(3)
+        layout_slider1.addWidget(self.vmin_window_slider)
+        
+        layout_slider2 = QtGui.QHBoxLayout()
+        layout_slider2.addWidget(QtGui.QLabel('Window Max:'))
+        layout_slider2.addWidget(self.vmax_window_slider)        
         
         layout_main = QtGui.QVBoxLayout()
         layout_main.addLayout(layout_top)
         layout_main.addLayout(layout_mid)
+        layout_main.addLayout(layout_slider1)
+        layout_main.addLayout(layout_slider2)
         self.setLayout(layout_main)
         
         button_load.clicked.connect(self.choose_dir)
@@ -218,7 +237,17 @@ class MainWindow(QtGui.QWidget):
         button_image_last.pressed.connect(self.change_image)
         button_image_fwd.pressed.connect(self.change_image)
         button_image_bwd.pressed.connect(self.change_image)
+        self.vmin_window_slider.sliderReleased.connect(self.set_image_window)
+        self.vmax_window_slider.sliderReleased.connect(self.set_image_window)
+    
+    @QTSlotExceptionRationalizer("bool")
+    def set_image_window(self):
+        self.vmin = self.vmin_window_slider.value()
+        self.vmax = self.vmax_window_slider.value()
         
+        self.plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
+        self.color_plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
+    
     @QTSlotExceptionRationalizer("bool")
     def clear_roi(self):        
         # remove the ROI from the screen, but do not delete it until it is
@@ -237,7 +266,7 @@ class MainWindow(QtGui.QWidget):
             axes = self.plot_im.get_axes()
             axes = []
             self.grey_activeROI = None
-            
+        # remove the ROI patches created when loading if necessary
         if self.grey_roi_patch is not None:        
             self.grey_roi_patch.remove()
         
@@ -276,8 +305,8 @@ class MainWindow(QtGui.QWidget):
         num, demon = str(self.image_index+1).rjust(2, '0'), str(num_images).rjust(2, '0')
         # display previous ROI if it exists
         self.clear_roi()
-        self.plot_im.make_image(self.images[self.image_index])
-        self.color_plot_im.make_image(self.images[self.image_index])
+        self.plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
+        self.color_plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
         self.load_roi()
         self.slice_label.setText("{}/{}".format(num, demon))
     
@@ -341,8 +370,8 @@ class MainWindow(QtGui.QWidget):
                 self.image_filename_list.append(attributes['filename'])
 
             self.image_filename = self.image_filename_list[self.image_index]
-            self.plot_im.make_image(self.images[self.image_index])
-            self.color_plot_im.make_image(self.images[self.image_index])
+            self.plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
+            self.color_plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
             num, demon = '01', str(len(self.images)).rjust(2, '0')
             self.slice_label.setText("{}/{}".format(num, demon))
             
@@ -409,7 +438,7 @@ class MainWindow(QtGui.QWidget):
             fix_x_points=np.arange(0,20000,1)
             axes.plot(fix_x_points,inversion_recovery(fix_x_points))          
             T1_corr=inversion_recovery['T1'].value*(2*inversion_recovery['aa'].value-1)
-            axes.text(0.7, 0.7, "T1 Value: {}ms".format(round(T1_corr)), transform=axes.transAxes)
+            axes.text(0.5, 0.7, "T1 Value: {}ms".format(round(T1_corr)), transform=axes.transAxes)
         elif relaxation_type == 'T2':    
             x, y = get_T2_decay_signal(self.dicom_list, self.images, roi_list)
             axes.plot(x, y, 'ro')
