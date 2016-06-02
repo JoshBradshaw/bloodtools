@@ -76,7 +76,6 @@ class ROISelectPlot(QtGui.QWidget):
         
     @QTSlotExceptionRationalizer("bool")
     def make_image(self, im, vmin=5, vmax=95):
-        self.axes.clear()        
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
         self.axes.set_autoscale_on(True)
         self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='gray', origin='image')
@@ -97,8 +96,7 @@ class ColourROISelectPlot(ROISelectPlot):
     Identical to ROI select plot, except colourized
     """
     @QTSlotExceptionRationalizer("bool")
-    def make_image(self, im, vmin=5, vmax=95):
-        self.axes.clear()        
+    def make_image(self, im, vmin=5, vmax=95):      
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
         self.axes.set_autoscale_on(True)
         self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='jet', origin='image')
@@ -252,13 +250,18 @@ class MainWindow(QtGui.QWidget):
     def clear_roi(self):        
         # remove the ROI from the screen, but do not delete it until it is
         # overwritten by another ROI
-        print "grey_roi: {}, color_roi: {}".format(self.grey_activeROI, self.color_activeROI)
-
+        # remove the ROI patches created when loading if necessary
+        if self.grey_roi_patch is not None:        
+            self.grey_roi_patch.remove()
+            self.grey_roi_patch = None
+        if self.color_roi_patch is not None:
+            self.color_roi_patch.remove()
+            self.color_roi_patch = None
+            
         if self.color_activeROI is not None:
             self.color_activeROI.remove()
             axes = self.color_plot_im.get_axes()
             axes = []
-            
             self.color_activeROI = None        
         
         if self.grey_activeROI is not None: # check if there is an ROI
@@ -266,13 +269,7 @@ class MainWindow(QtGui.QWidget):
             axes = self.plot_im.get_axes()
             axes = []
             self.grey_activeROI = None
-        # remove the ROI patches created when loading if necessary
-        if self.grey_roi_patch is not None:        
-            self.grey_roi_patch.remove()
-        
-        if self.color_roi_patch is not None:
-            self.color_roi_patch.remove()
-        
+
         grey_figure = self.plot_im.get_figure()
         grey_figure.canvas.draw()
         color_figure = self.color_plot_im.get_figure()
@@ -438,7 +435,7 @@ class MainWindow(QtGui.QWidget):
             fix_x_points=np.arange(0,20000,1)
             axes.plot(fix_x_points,inversion_recovery(fix_x_points))          
             T1_corr=inversion_recovery['T1'].value*(2*inversion_recovery['aa'].value-1)
-            axes.text(0.5, 0.7, "T1 Value: {}ms".format(round(T1_corr)), transform=axes.transAxes)
+            axes.text(0.3, 0.9, "T1 Value: {}ms".format(round(T1_corr)), transform=axes.transAxes)
         elif relaxation_type == 'T2':    
             x, y = get_T2_decay_signal(self.dicom_list, self.images, roi_list)
             axes.plot(x, y, 'ro')
@@ -451,7 +448,7 @@ class MainWindow(QtGui.QWidget):
             fit_y_points = [first_coeff * x_ + zeroth_coeff for x_ in fit_x_points]
             axes.plot(fit_x_points, fit_y_points, 'b-')
             t2_value = -1*(fit_x_points[-1] - fit_x_points[0])/(fit_y_points[-1] - fit_y_points[0])
-            axes.text(0.7, 0.7, "T2 Value: {}ms".format(round(t2_value)), transform=axes.transAxes)
+            axes.text(0.3, 0.9, "T2 Value: {}ms".format(round(t2_value)), transform=axes.transAxes)
         else:
             raise NotImplementedError("This mapping type's fitting algorithm has not been implemented yet") 
             
@@ -478,9 +475,6 @@ def get_T2_decay_signal(dicom_list, image_list, roi_list, log_scale=True):
         signal.append(mean_signal_magnitude_over_ROI)
         log_signal.append(math.log(mean_signal_magnitude_over_ROI))
     
-    print "Prep times: {}".format(prep_times)
-    print "T2 signal intensities: {}".format(log_signal)    
-    
     if log_scale:
         return prep_times, log_signal
     else:
@@ -497,9 +491,6 @@ def get_T1_decay_signal(image_attributes, image_list, roi_list, log_scale=True):
         mean_signal_magnitude_over_ROI = blood_tools.calc_ROI_mean(roi, image)
         signal.append(mean_signal_magnitude_over_ROI)
         log_signal.append(math.log(mean_signal_magnitude_over_ROI))
-    
-    print "Inversion Times: {}".format(inversion_times)
-    print "T1 signal intensities: {}".format(log_signal)    
     
     if log_scale:
         return inversion_times, np.array(log_signal)

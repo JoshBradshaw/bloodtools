@@ -51,12 +51,14 @@ class ROI(object):
         self.color = color
 
     def __getstate__(self):
-        return {'im':self.im, 'xcoords':self.xcoords, 'ycoords':self.ycoords}
+        return {'im':self.im, 'xcoords':self.xcoords, 'ycoords':self.ycoords, 'color': self.color}
         
     def __setstate__(self, d):
         self.im = d['im']
         self.xcoords = d['xcoords']
         self.ycoords= d['ycoords']
+        self.color = d['color']
+        self.patch = None
         
     def draw(self, axes, figure, color):
         poly=plt.Polygon(zip(self.xcoords,self.ycoords))
@@ -65,9 +67,9 @@ class ROI(object):
         poly.set_edgecolor(color)
         poly.set_facecolor('none')
         poly.set_hatch('//')
-        self.patch = axes.add_patch(poly)
+        patch = axes.add_patch(poly)
         figure.canvas.draw()
-        return self.patch
+        return patch
         
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -78,13 +80,12 @@ class ROI(object):
             ax = event.inaxes
             x, y = event.xdata, event.ydata
             
-            if event.button == None and self.line != None: # Move line around 
+            if event.button == None and self.line is not None: # Move line around 
                 self.line.set_data([self.previous_point[0], x],
                                    [self.previous_point[1], y])      
                 self.fig.canvas.draw()
             elif event.button == 1: # Free Hand Drawing
-                    line = plt.Line2D([self.previous_point[0], x], [self.previous_point[1], y], color=self.color)                  
-  
+                    line = plt.Line2D([self.previous_point[0], x], [self.previous_point[1], y], color=self.color)
                     ax.add_line(line)
                     self.lines.append(line)
                     self.previous_point = [x, y]
@@ -209,12 +210,14 @@ class ROIcircle(ROI):
         self.color = color
 
     def __getstate__(self):
-        return {'im':self.im, 'circle':(self.center, self.radius)}
+        return {'im':self.im, 'circle':(self.center, self.radius), 'color': self.color}
 
     def __setstate__(self, d):
         self.im = d['im']
         self.center, self.radius = d['circle']
+        self.color = d['color']
         self.circ = plt.Circle(*d['circle'], facecolor='none', edgecolor=self.color)
+        self.patch = None
         
     def draw(self, axes, figure, color):
         mycirc=plt.Circle(self.center,self.radius,color=color)
@@ -223,9 +226,9 @@ class ROIcircle(ROI):
         mycirc.set_edgecolor(color)
         mycirc.set_facecolor('none')
         mycirc.set_hatch('//')
-        self.circ = axes.add_artist(mycirc)
+        circ = axes.add_artist(mycirc)
         figure.canvas.draw()
-        return self.circ
+        return circ
         
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
@@ -264,9 +267,7 @@ class ROIcircle(ROI):
                     self.circ.set_alpha(1)
                     self.completion_callback()
                     self.disconnect()
-
             elif event.button == 3 and self.circ != None: # middle button: remove last segment
-                # ax.artists.remove(self.circ)
                 self.circ.remove()
                 self.circ = None
             self.fig.canvas.draw()
@@ -295,12 +296,14 @@ class ROIcircle(ROI):
 
 class ROIellipse(ROIcircle):      
     def __getstate__(self):
-        return {'im':self.im, 'circle':(self.center, self.width, self.height)}
+        return {'im':self.im, 'circle':(self.center, self.width, self.height), 'color': self.color}
 
     def __setstate__(self, d):
         self.im = d['im']
         self.center, self.width, self.height = d['circle']
         self.circ = Ellipse(*d['circle'], facecolor='none', edgecolor=self.color)
+        self.color = self.color
+        self.patch = None
         
     def draw(self, axes, figure, color):
         mycirc = Ellipse(self.center, self.width, self.height, facecolor='none', edgecolor=color)
@@ -308,9 +311,9 @@ class ROIellipse(ROIcircle):
         mycirc.set_alpha(1)
         mycirc.set_facecolor('none')
         mycirc.set_hatch('//')
-        self.circ = axes.add_artist(mycirc)
+        circ = axes.add_artist(mycirc)
         figure.canvas.draw()
-        return self.circ
+        return circ
 
     def motion_notify_callback(self, event):
         """Draw a line from the last selected point to current pointer
