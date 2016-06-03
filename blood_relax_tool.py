@@ -326,8 +326,10 @@ class MainWindow(QtGui.QWidget):
             num, demon = str(self.image_index+1).rjust(2, '0'), str(num_images).rjust(2, '0')
             # display previous ROI if it exists
             self.clear_roi()
-            self.plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
-            self.color_plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
+            self.plot_im.mpl_im.set_data(self.images[self.image_index])
+            self.color_plot_im.mpl_im.set_data(self.images[self.image_index])
+            self.plot_im.figure.canvas.draw()
+            self.color_plot_im.figure.canvas.draw()
             self.load_roi()
             self.slice_label.setText("{}/{}".format(num, demon))
     
@@ -377,6 +379,9 @@ class MainWindow(QtGui.QWidget):
     def choose_dir(self, event):        
         """opens a directory choose dialog box, allows the user to select their
         dicom series of interest and loads that series."""  
+        self.plot_graph.axes.clear()
+        self.plot_graph.figure.canvas.draw()        
+        
         if self.directory:
             out = QtGui.QFileDialog.getExistingDirectory(directory=os.path.split(self.directory)[0], caption='MRI Data Directory')
         else:
