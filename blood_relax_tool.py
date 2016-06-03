@@ -73,10 +73,12 @@ class ROISelectPlot(QtGui.QWidget):
         layout.addWidget(self.canvas)
         layout.addWidget(self.toolbar)
         self.setLayout(layout)
+        self.im = None
         
     @QTSlotExceptionRationalizer("bool")
     def make_image(self, im, vmin=5, vmax=95):
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
+        self.im = im
         self.axes.set_autoscale_on(True)
         self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='gray', origin='image')
         self.axes.set_autoscale_on(False)
@@ -98,6 +100,7 @@ class ColourROISelectPlot(ROISelectPlot):
     @QTSlotExceptionRationalizer("bool")
     def make_image(self, im, vmin=5, vmax=95):      
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
+        self.im = im
         self.axes.set_autoscale_on(True)
         self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='jet', origin='image')
         self.axes.set_autoscale_on(False)
@@ -141,24 +144,25 @@ class MainWindow(QtGui.QWidget):
         self.vmax = 95
         self.grey_roi_patch = None
         self.color_roi_patch = None
+        self.controls_enabled(False)
 
     @QTSlotExceptionRationalizer("bool")
     def init_gui(self):
         QtGui.QWidget.__init__(self, parent=None)
         # button for opening dicom directory
-        button_load = QtGui.QPushButton(qtawesome.icon('fa.folder-open-o'), '')
-        button_run = QtGui.QPushButton('Fit Data') 
-        button_draw_roi = QtGui.QPushButton('Draw ROI') 
+        self.button_load = QtGui.QPushButton(qtawesome.icon('fa.folder-open-o'), '')
+        self.button_run = QtGui.QPushButton('Fit Data') 
+        self.button_draw_roi = QtGui.QPushButton('Draw ROI') 
         # first/last prev/next buttons for scrolling through the dicoms
-        button_image_fwd = QtGui.QPushButton(qtawesome.icon('fa.chevron-right'), '')
-        button_image_fwd.setObjectName('slice_fwd')
-        button_image_bwd = QtGui.QPushButton(qtawesome.icon('fa.chevron-left'), '')
-        button_image_bwd.setObjectName('slice_bwd')
+        self.button_image_fwd = QtGui.QPushButton(qtawesome.icon('fa.chevron-right'), '')
+        self.button_image_fwd.setObjectName('slice_fwd')
+        self.button_image_bwd = QtGui.QPushButton(qtawesome.icon('fa.chevron-left'), '')
+        self.button_image_bwd.setObjectName('slice_bwd')
         
-        button_image_first = QtGui.QPushButton(qtawesome.icon('fa.step-backward'), '')
-        button_image_first.setObjectName('slice_first')
-        button_image_last = QtGui.QPushButton(qtawesome.icon('fa.step-forward'), '')
-        button_image_last.setObjectName('slice_last')
+        self.button_image_first = QtGui.QPushButton(qtawesome.icon('fa.step-backward'), '')
+        self.button_image_first.setObjectName('slice_first')
+        self.button_image_last = QtGui.QPushButton(qtawesome.icon('fa.step-forward'), '')
+        self.button_image_last.setObjectName('slice_last')
         self.slice_label = QtGui.QLabel('(00/00)')
         # set whether the ROI should apply to a single slice or all of the slices
         self.combo_roi_scope = QtGui.QComboBox()   
@@ -169,7 +173,7 @@ class MainWindow(QtGui.QWidget):
         self.combo_roi_style.addItems(['Polygon','Circle', 'Ellipse'])
         self.combo_roi_style.setCurrentIndex(0)
         # fit either a basic T1, or basic T2 fit
-        combo_relax_label = QtGui.QLabel('Fit Type')
+        self.combo_relax_label = QtGui.QLabel('Fit Type')
         self.combo_relax = QtGui.QComboBox()
         self.combo_relax.addItems(['T1', 'T2'])
         self.combo_relax.setCurrentIndex(0)
@@ -180,15 +184,15 @@ class MainWindow(QtGui.QWidget):
         
         layout_top = QtGui.QHBoxLayout()
         layout_top.addSpacing(10)
-        layout_top.addWidget(button_load)
+        layout_top.addWidget(self.button_load)
         
         layout_top.addStretch()
         layout_top.addWidget(QtGui.QLabel('Change Slice:'))
 
-        layout_top.addWidget(button_image_first)
-        layout_top.addWidget(button_image_bwd)
-        layout_top.addWidget(button_image_fwd) 
-        layout_top.addWidget(button_image_last)
+        layout_top.addWidget(self.button_image_first)
+        layout_top.addWidget(self.button_image_bwd)
+        layout_top.addWidget(self.button_image_fwd) 
+        layout_top.addWidget(self.button_image_last)
         layout_top.addWidget(self.slice_label)
         
         layout_top.addStretch()
@@ -196,11 +200,11 @@ class MainWindow(QtGui.QWidget):
         layout_top.addWidget(self.combo_roi_style)
         layout_top.addWidget(QtGui.QLabel('Apply ROI to:'))
         layout_top.addWidget(self.combo_roi_scope)
-        layout_top.addWidget(button_draw_roi)
+        layout_top.addWidget(self.button_draw_roi)
         layout_top.addStretch()
-        layout_top.addWidget(combo_relax_label)
+        layout_top.addWidget(self.combo_relax_label)
         layout_top.addWidget(self.combo_relax)
-        layout_top.addWidget(button_run)
+        layout_top.addWidget(self.button_run)
         layout_top.addSpacing(10)
         
         layout_mid = QtGui.QHBoxLayout()
@@ -228,23 +232,44 @@ class MainWindow(QtGui.QWidget):
         layout_main.addLayout(layout_slider2)
         self.setLayout(layout_main)
         
-        button_load.clicked.connect(self.choose_dir)
-        button_run.clicked.connect(self.process_data)
-        button_draw_roi.pressed.connect(self.start_roi)
-        button_image_first.pressed.connect(self.change_image)
-        button_image_last.pressed.connect(self.change_image)
-        button_image_fwd.pressed.connect(self.change_image)
-        button_image_bwd.pressed.connect(self.change_image)
-        self.vmin_window_slider.sliderReleased.connect(self.set_image_window)
-        self.vmax_window_slider.sliderReleased.connect(self.set_image_window)
+        self.button_load.clicked.connect(self.choose_dir)
+        self.button_run.clicked.connect(self.process_data)
+        self.button_draw_roi.pressed.connect(self.start_roi)
+        self.button_image_first.pressed.connect(self.change_image)
+        self.button_image_last.pressed.connect(self.change_image)
+        self.button_image_fwd.pressed.connect(self.change_image)
+        self.button_image_bwd.pressed.connect(self.change_image)
+        self.vmin_window_slider.valueChanged.connect(self.set_image_window)
+        self.vmax_window_slider.valueChanged.connect(self.set_image_window)
+
+    @QTSlotExceptionRationalizer("bool")
+    def controls_enabled(self, enable=True):
+        self.button_run.setEnabled(enable)
+        self.button_draw_roi.setEnabled(enable)
+        self.button_image_first.setEnabled(enable)
+        self.button_image_last.setEnabled(enable)
+        self.button_image_fwd.setEnabled(enable)
+        self.button_image_bwd.setEnabled(enable)
+        self.combo_roi_style.setEnabled(enable)
+        self.combo_relax.setEnabled(enable)
+        self.combo_roi_scope.setEnabled(enable)
     
     @QTSlotExceptionRationalizer("bool")
-    def set_image_window(self):
+    def set_image_window(self, e):
         self.vmin = self.vmin_window_slider.value()
         self.vmax = self.vmax_window_slider.value()
         
-        self.plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
-        self.color_plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
+        if self.vmin <= self.vmax and self.plot_im.im is not None:
+            im_vmin = np.percentile(self.plot_im.im, self.vmin)
+            im_vmax = np.percentile(self.plot_im.im, self.vmax)
+
+            grey_image = self.plot_im.mpl_im.set_clim(im_vmin, im_vmax)
+            color_image = self.color_plot_im.mpl_im.set_clim(im_vmin, im_vmax)
+            
+            self.plot_im.figure.canvas.draw()
+            self.color_plot_im.figure.canvas.draw()
+        else: # matplotlib will throw an error if the window is negative
+            pass
     
     @QTSlotExceptionRationalizer("bool")
     def clear_roi(self):        
@@ -275,7 +300,6 @@ class MainWindow(QtGui.QWidget):
         color_figure = self.color_plot_im.get_figure()
         color_figure.canvas.draw()
         
-
     @QTSlotExceptionRationalizer("bool")
     def change_image(self):
         # serialize existing ROIs to file, this is quick+dirty b/c I haven't
@@ -297,15 +321,15 @@ class MainWindow(QtGui.QWidget):
             else:
                 self.image_index = num_images - 1
         
-        self.image_filename = self.image_filename_list[self.image_index]
-        # display the slice selection label, with zero padding to keep the toolbar from shifting around
-        num, demon = str(self.image_index+1).rjust(2, '0'), str(num_images).rjust(2, '0')
-        # display previous ROI if it exists
-        self.clear_roi()
-        self.plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
-        self.color_plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
-        self.load_roi()
-        self.slice_label.setText("{}/{}".format(num, demon))
+            self.image_filename = self.image_filename_list[self.image_index]
+            # display the slice selection label, with zero padding to keep the toolbar from shifting around
+            num, demon = str(self.image_index+1).rjust(2, '0'), str(num_images).rjust(2, '0')
+            # display previous ROI if it exists
+            self.clear_roi()
+            self.plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
+            self.color_plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
+            self.load_roi()
+            self.slice_label.setText("{}/{}".format(num, demon))
     
     @QTSlotExceptionRationalizer("bool")
     def grey_roi_complete_callback(self):
@@ -358,6 +382,7 @@ class MainWindow(QtGui.QWidget):
         else:
             out = QtGui.QFileDialog.getExistingDirectory(caption='MRI Data Directory')
         if out:
+            self.plot_graph.axes.clear()
             self.clear_roi()
             self.directory = out
             self.roi_path = os.path.join(self.directory, '.ROIs')
@@ -368,6 +393,7 @@ class MainWindow(QtGui.QWidget):
 
             self.image_filename = self.image_filename_list[self.image_index]
             self.plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
+            self.controls_enabled(True)
             self.color_plot_im.make_image(self.images[self.image_index], self.vmin, self.vmax)
             num, demon = '01', str(len(self.images)).rjust(2, '0')
             self.slice_label.setText("{}/{}".format(num, demon))
@@ -395,8 +421,9 @@ class MainWindow(QtGui.QWidget):
         if not len(self.images) > 0:
             error = QtGui.QErrorMessage()
             error.showMessage('You must a load a series of images before drawing the ROI')
-            error.exec_()        
-            
+            error.exec_()
+            return        
+           
         roi_style = self.get_roi_style().lower() # style names are lowercase in ROI.py
         
         self.clear_roi()
@@ -411,11 +438,17 @@ class MainWindow(QtGui.QWidget):
         
     @QTSlotExceptionRationalizer("bool")
     def process_data(self, event):
+        if not len(self.images) > 0:
+            error = QtGui.QErrorMessage()
+            error.showMessage('You must load a series of dicom images before fitting the data')
+            error.exec_()
+            return        
+        
         # todo add error message if images or ROI not loaded
-        axes = self.plot_graph.axes
-        axes.clear()
         relaxation_type = self.get_relax_type()      
         roi_list = [self.image_ROIs[img_fn] for img_fn in self.image_filename_list]
+        axes = self.plot_graph.axes
+        axes.clear()
 
         if relaxation_type == 'T1':
             ti, signal = get_T1_decay_signal(self.image_attributes, self.images, roi_list, log_scale=False)
@@ -474,7 +507,6 @@ def get_T2_decay_signal(dicom_list, image_list, roi_list, log_scale=True):
         mean_signal_magnitude_over_ROI = blood_tools.calc_ROI_mean(roi, image)
         signal.append(mean_signal_magnitude_over_ROI)
         log_signal.append(math.log(mean_signal_magnitude_over_ROI))
-    
     if log_scale:
         return prep_times, log_signal
     else:
