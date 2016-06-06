@@ -141,6 +141,8 @@ class ROI(object):
                 self.disconnect()
                 self.fig.canvas.draw()
                 self.completion_callback()
+            else:
+                pass # do not respond to any other types of key presses
 
     def get_coords(self):
         """Returns the x,y coordinates of that have been selected

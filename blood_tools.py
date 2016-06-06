@@ -61,7 +61,7 @@ def load_ROIs(filename):
 
 def read_dicoms(foldername, attributes=[]):
     """Read in all the dicom files in a folder and any necessary attributes"""   
-    file_list=os.listdir(foldername)
+    file_list= [fn for fn in os.listdir(foldername) if os.path.isfile(os.path.join(foldername, fn))]
     file_list.sort()
     image_list=[]
     dicom_list = []
@@ -78,7 +78,7 @@ def read_dicoms(foldername, attributes=[]):
         image_list.append(dicom_obj.pixel_array)
         attribute_dict['filename'] = file_name
         for item in attributes:
-            attribute_dict[item]=getattr(dicom_obj,item,0)       
+            attribute_dict[item]=getattr(dicom_obj,item,0)
         attribute_list.append(attribute_dict)
     return image_list, attribute_list, dicom_list     
 

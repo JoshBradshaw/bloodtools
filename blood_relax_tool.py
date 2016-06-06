@@ -23,6 +23,7 @@ import numpy as np
 import ROI
 import blood_tools
 import fitting
+from pprint import pprint
 
 def QTSlotExceptionRationalizer(*args):
     """
@@ -263,8 +264,8 @@ class MainWindow(QtGui.QWidget):
             im_vmin = np.percentile(self.plot_im.im, self.vmin)
             im_vmax = np.percentile(self.plot_im.im, self.vmax)
 
-            grey_image = self.plot_im.mpl_im.set_clim(im_vmin, im_vmax)
-            color_image = self.color_plot_im.mpl_im.set_clim(im_vmin, im_vmax)
+            self.plot_im.mpl_im.set_clim(im_vmin, im_vmax)
+            self.color_plot_im.mpl_im.set_clim(im_vmin, im_vmax)
             
             self.plot_im.figure.canvas.draw()
             self.color_plot_im.figure.canvas.draw()
@@ -380,7 +381,7 @@ class MainWindow(QtGui.QWidget):
         """opens a directory choose dialog box, allows the user to select their
         dicom series of interest and loads that series."""  
         self.plot_graph.axes.clear()
-        self.plot_graph.figure.canvas.draw()        
+        self.plot_graph.figure.canvas.draw()
         
         if self.directory:
             out = QtGui.QFileDialog.getExistingDirectory(directory=os.path.split(self.directory)[0], caption='MRI Data Directory')
@@ -392,6 +393,12 @@ class MainWindow(QtGui.QWidget):
             self.directory = out
             self.roi_path = os.path.join(self.directory, '.ROIs')
             self.images, self.image_attributes, self.dicom_list = blood_tools.read_dicoms(out, ['InversionTime'])
+            
+            if not self.images:
+                error = QtGui.QErrorMessage()
+                error.showMessage('The selected directory does not contain a DICOM series which this widget is capable of loading')
+                error.exec_()
+                return
             
             for attributes in self.image_attributes:
                 self.image_filename_list.append(attributes['filename'])
@@ -406,6 +413,7 @@ class MainWindow(QtGui.QWidget):
             # load image ROIs if possible
             if os.path.isfile(self.roi_path):
                 with open(self.roi_path, 'r') as f:
+                    self.image_ROIs = {}
                     self.image_ROIs = cPickle.load(f)
             self.load_roi()
         else: # user hit the cancel or x button to leave the dialog
@@ -443,6 +451,12 @@ class MainWindow(QtGui.QWidget):
         
     @QTSlotExceptionRationalizer("bool")
     def process_data(self, event):
+        if not all(fn in self.image_ROIs for fn in self.image_filename_list):
+            error = QtGui.QErrorMessage()
+            error.showMessage("You must draw an ROI on every slice before you can fit the data. Use the 'All Slices' option if the ROIs are conincident accross the slices")
+            error.exec_()
+            return               
+            
         if not len(self.images) > 0:
             error = QtGui.QErrorMessage()
             error.showMessage('You must load a series of dicom images before fitting the data')
@@ -457,6 +471,12 @@ class MainWindow(QtGui.QWidget):
 
         if relaxation_type == 'T1':
             ti, signal = get_T1_decay_signal(self.image_attributes, self.images, roi_list, log_scale=False)
+            if not len(ti) or ti[0] == 0:
+                error = QtGui.QErrorMessage()
+                error.showMessage('Failed to find T1 recovery times for this dataset, ensure that this is a T1 series')
+                error.exec_()
+                return
+            
             axes.plot(ti, signal, 'ro')
             axes.set_xlabel('inversion time (ms)')
             axes.set_ylabel('signal intensity')
@@ -471,11 +491,17 @@ class MainWindow(QtGui.QWidget):
                 
             inversion_recovery.fit(ti, signal)
             fix_x_points=np.arange(0,20000,1)
-            axes.plot(fix_x_points,inversion_recovery(fix_x_points))          
+            axes.plot(fix_x_points,inversion_recovery(fix_x_points), 'r-')          
             T1_corr=inversion_recovery['T1'].value*(2*inversion_recovery['aa'].value-1)
             axes.text(0.3, 0.9, "T1 Value: {}ms".format(round(T1_corr)), transform=axes.transAxes)
         elif relaxation_type == 'T2':    
             x, y = get_T2_decay_signal(self.dicom_list, self.images, roi_list)
+            if not len(x):
+                error = QtGui.QErrorMessage()
+                error.showMessage('Failed to find T2 recovery times for this dataset, ensure that this is a T2 series')
+                error.exec_()
+                return            
+            
             axes.plot(x, y, 'ro')
             axes.set_xlabel('TE time (ms)')
             axes.set_ylabel('log(signal intensity)')
