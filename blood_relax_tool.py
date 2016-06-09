@@ -81,7 +81,7 @@ class ROISelectPlot(QtGui.QWidget):
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
         self.im = im
         self.axes.set_autoscale_on(True)
-        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='gray', origin='image')
+        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='gray', origin='upper')
         self.axes.set_autoscale_on(False)
         self.figure.canvas.draw()
         
@@ -103,7 +103,7 @@ class ColourROISelectPlot(ROISelectPlot):
         # only turn autoscale on when setting the image so that ROI changes won't tweak the autoscale
         self.im = im
         self.axes.set_autoscale_on(True)
-        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='jet', origin='image')
+        self.mpl_im = self.axes.imshow(im, vmin=np.percentile(im, vmin),vmax=np.percentile(im, vmax), cmap='jet', origin='upper')
         self.axes.set_autoscale_on(False)
         self.figure.canvas.draw()
 
@@ -288,8 +288,7 @@ class MainWindow(QtGui.QWidget):
             self.color_activeROI.remove()
             axes = self.color_plot_im.get_axes()
             axes = []
-            self.color_activeROI = None        
-        
+            self.color_activeROI = None
         if self.grey_activeROI is not None: # check if there is an ROI
             self.grey_activeROI.remove()
             axes = self.plot_im.get_axes()
@@ -343,7 +342,8 @@ class MainWindow(QtGui.QWidget):
                 self.image_ROIs[img_fn] = self.grey_activeROI
         else:
             self.image_ROIs[self.image_filename] = self.grey_activeROI
-        # save ROI files
+            
+        #save ROI files
         with open(self.roi_path, 'w') as f:
             cPickle.dump(self.image_ROIs, f)
         
@@ -435,7 +435,7 @@ class MainWindow(QtGui.QWidget):
             error = QtGui.QErrorMessage()
             error.showMessage('You must a load a series of images before drawing the ROI')
             error.exec_()
-            return        
+            return
            
         roi_style = self.get_roi_style().lower() # style names are lowercase in ROI.py
         
@@ -451,18 +451,19 @@ class MainWindow(QtGui.QWidget):
         
     @QTSlotExceptionRationalizer("bool")
     def process_data(self, event):
+
         if not all(fn in self.image_ROIs for fn in self.image_filename_list):
             error = QtGui.QErrorMessage()
             error.showMessage("You must draw an ROI on every slice before you can fit the data. Use the 'All Slices' option if the ROIs are conincident accross the slices")
             error.exec_()
-            return               
+            return
             
         if not len(self.images) > 0:
             error = QtGui.QErrorMessage()
             error.showMessage('You must load a series of dicom images before fitting the data')
             error.exec_()
-            return        
-        
+            return
+
         # todo add error message if images or ROI not loaded
         relaxation_type = self.get_relax_type()      
         roi_list = [self.image_ROIs[img_fn] for img_fn in self.image_filename_list]
@@ -496,6 +497,7 @@ class MainWindow(QtGui.QWidget):
             axes.text(0.3, 0.9, "T1 Value: {}ms".format(round(T1_corr)), transform=axes.transAxes)
         elif relaxation_type == 'T2':    
             x, y = get_T2_decay_signal(self.dicom_list, self.images, roi_list)
+
             if not len(x):
                 error = QtGui.QErrorMessage()
                 error.showMessage('Failed to find T2 recovery times for this dataset, ensure that this is a T2 series')
@@ -511,11 +513,10 @@ class MainWindow(QtGui.QWidget):
             fit_x_points = np.linspace(start, stop, 1000)
             fit_y_points = [first_coeff * x_ + zeroth_coeff for x_ in fit_x_points]
             axes.plot(fit_x_points, fit_y_points, 'b-')
-            t2_value = -1*(fit_x_points[-1] - fit_x_points[0])/(fit_y_points[-1] - fit_y_points[0])
+            t2_value = -1/first_coeff
             axes.text(0.3, 0.9, "T2 Value: {}ms".format(round(t2_value)), transform=axes.transAxes)
         else:
             raise NotImplementedError("This mapping type's fitting algorithm has not been implemented yet") 
-            
         self.plot_graph.figure.canvas.draw()
             
 def get_T2_decay_signal(dicom_list, image_list, roi_list, log_scale=True):

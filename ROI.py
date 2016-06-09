@@ -3,6 +3,8 @@
 This example shows how to use matplotlib to create regions of interest.  
 Original code by Daniel Kornhauser, modified by M Durant.
 """
+from __future__ import division
+
 import pylab as plt
 from skimage.draw import polygon, circle, ellipse
 import numpy as np
@@ -43,7 +45,6 @@ class ROI(object):
         self.fig = fig
         self.fig.canvas.draw()
         self.patch = None
-        self.type = 'poly'
         cid1 = fig.canvas.mpl_connect('motion_notify_event', self.motion_notify_callback)
         cid2 = fig.canvas.mpl_connect('button_press_event', self.button_press_callback)
         self.events = cid1,cid2
@@ -198,7 +199,6 @@ class ROIcircle(ROI):
         self.circ = None    
         self.im = im.get_size()
         self.fig =  fig
-        self.type = 'circ'
         self.axes = ax
         # preserve these so that we can blow away the self.circ object as needed
         self.radius = None
@@ -267,8 +267,8 @@ class ROIcircle(ROI):
                     self.circ.set_hatch('//')
                     self.circ.set_linewidth(1)
                     self.circ.set_alpha(1)
-                    self.completion_callback()
                     self.disconnect()
+                    self.completion_callback()
             elif event.button == 3 and self.circ != None: # middle button: remove last segment
                 self.circ.remove()
                 self.circ = None
@@ -277,21 +277,27 @@ class ROIcircle(ROI):
     def get_coords(self):
         """Returns the x,y coordinates of that have been selected
         so far."""
-        if self.circ is not None:
-            return self.circ.center, self.circ.radius
+        if not self.center or not self.radius:
+            raise ValueError("cannot get circle coordinates before it's dimesions are defined")
+        
+        return self.center, self.radius
 
     def get_indices(self):
         """Returns a set of points that lie inside the picked polygon."""
-        coo = self.get_coords()
-        if coo is None:
-            return None
-        (x, y), r = coo
+        if not self.center or not self.radius:
+            raise ValueError("cannot get circle indicies before its dimensions are defined")
+        
+        x, y = self.center
+        r = self.radius
         return circle(y, x, r, self.im)
 
     def remove(self):
         """Take ROI polygon/lines off the image."""
         if self.circ:
-            self.circ.remove()
+            try:
+                self.circ.remove()
+            except NotImplementedError:             
+                pass
             self.circ = None
         if hasattr(self, 'fig'):
             self.disconnect()
@@ -364,15 +370,19 @@ class ROIellipse(ROIcircle):
     def get_coords(self):
         """Returns the x,y coordinates of that have been selected
         so far."""
-        if self.circ is not None:
-            return self.circ.center, self.circ.width, self.circ.height
+        if not self.center:
+            raise ValueError("cannot get ellipse coordinates before the dimensions are defined")
+        
+        return self.center, self.width, self.height
 
     def get_indices(self):
         """Returns a set of points that lie inside the picked polygon."""
-        coo = self.get_coords()
-        if coo is None:
-            return None
-        (x, y), w, h = coo
+        if not self.center:
+            raise ValueError("Cannot get ellipse indices before the dimensions are defined")
+        
+        x, y = self.center
+        w = self.width
+        h = self.height
         return ellipse(y, x, h/2., w/2., self.im)
 
 def new_ROI(image, axis, figure, shape='polygon', color='r', completion_callback=None):
