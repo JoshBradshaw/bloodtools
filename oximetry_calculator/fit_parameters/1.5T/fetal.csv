@@ -1,0 +1,9 @@
+R1_plas,0.44
+R1_ery_0,0.95
+r1_prime_dHB,0.29
+R2_plas,1.6
+R2_dia_plus_R2_oxy,5.1
+R2_deoxy_minus_R2_oxy,-3.1
+w_dia_plus_w_oxy,-0.071
+w_deo_minus_w_oxy,-0.62
+tau,2.27

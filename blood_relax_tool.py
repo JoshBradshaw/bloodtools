@@ -233,8 +233,8 @@ class MainWindow(QtGui.QWidget):
         layout_main.addLayout(layout_slider2)
         self.setLayout(layout_main)
         
-        self.button_load.clicked.connect(self.choose_dir)
-        self.button_run.clicked.connect(self.process_data)
+        self.button_load.pressed.connect(self.choose_dir)
+        self.button_run.pressed.connect(self.process_data)
         self.button_draw_roi.pressed.connect(self.start_roi)
         self.button_image_first.pressed.connect(self.change_image)
         self.button_image_last.pressed.connect(self.change_image)
