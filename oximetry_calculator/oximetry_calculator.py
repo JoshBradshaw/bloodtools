@@ -32,10 +32,7 @@ import numpy as np
 import csv
 from inspect import getsourcefile
 from pprint import pprint
-import time
-import cStringIO
 from functools import wraps
-import sys
 
 class Bunch(object):
   def __init__(self, adict):
@@ -127,7 +124,7 @@ class MainWindow(QtGui.QWidget):
         layout_main.addWidget(self.t1_input, 3, 2)
         layout_main.addWidget(QtGui.QLabel('T2 (ms)'), 4, 1)
         layout_main.addWidget(self.t2_input, 4, 2)
-        layout_main.addWidget(QtGui.QLabel('tau_180(ms)'), 5, 1)
+        layout_main.addWidget(QtGui.QLabel('tau_180 (ms)'), 5, 1)
         layout_main.addWidget(self.tau_180_input, 5, 2)
         layout_main.addWidget(QtGui.QLabel('sO2 (decimal)'), 6, 1)
         layout_main.addWidget(self.sO2_input, 6, 2)
@@ -139,6 +136,7 @@ class MainWindow(QtGui.QWidget):
         layout_main.addWidget(self.case_type_selector, 9, 2)
         
         layout_main.addWidget(self.button_solve, 10,1,1,4)
+        layout_main.addWidget(QtGui.QLabel("Created by Josh Bradshaw, using Sharon Portney's manuscript.\nCite: \nMIT Licensed"), 11, 1, 1, 4)
         
         layout_main.addWidget(QtGui.QLabel('OUTPUTS'), 1, 3, 1, 2)
         layout_main.addWidget(QtGui.QLabel('sO2 (decimal)'), 2, 3)
@@ -359,44 +357,7 @@ def alt_Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180):
     for so2_root in SO2_vals:
         Hct_vals.append(Hct_from_T1_sO2(parameters, T1, so2_root))
     return Hct_vals, SO2_vals
-    
-def excepthook(excType, excValue, tracebackobj):
-    """
-    Global function to catch unhandled exceptions.
-    
-    @param excType exception type
-    @param excValue exception value
-    @param tracebackobj traceback object
-    """
-    separator = '-' * 80
-    logFile = "simple.log"
-    notice = \
-        """An unhandled exception occurred. Please report the problem\n"""\
-        """using the error reporting dialog or via email to <%s>.\n"""\
-        """A log has been written to "%s".\n\nError information:\n""" % \
-        ("yourmail at server.com", "")
-    versionInfo="0.0.1"
-    timeString = time.strftime("%Y-%m-%d, %H:%M:%S")
-    
-    
-    tbinfofile = cStringIO.StringIO()
-    traceback.print_tb(tracebackobj, None, tbinfofile)
-    tbinfofile.seek(0)
-    tbinfo = tbinfofile.read()
-    errmsg = '%s: \n%s' % (str(excType), str(excValue))
-    sections = [separator, timeString, separator, errmsg, separator, tbinfo]
-    msg = '\n'.join(sections)
-    try:
-        f = open(logFile, "w")
-        f.write(msg)
-        f.write(versionInfo)
-        f.close()
-    except IOError:
-        pass
-    errorbox = QtGui.QMessageBox()
-    errorbox.setText(str(notice)+str(msg)+str(versionInfo))
-    errorbox.exec_()
-    
+        
 def main():
     app = QtGui.QApplication.instance() or QtGui.QApplication([])
     win = MainWindow()
@@ -406,5 +367,4 @@ def main():
     return win
 
 if __name__ == '__main__':
-    #sys.excepthook = excepthook
     win = main()

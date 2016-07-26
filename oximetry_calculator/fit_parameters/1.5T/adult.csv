@@ -1,9 +1,9 @@
-R1_plas,0.41
-R1_ery_0,0.94
-r1_prime_dHB,0.17
-R2_plas,1.95
-R2_dia_plus_R2_oxy,4.9
-R2_deoxy_minus_R2_oxy,-2
-w_dia_plus_w_oxy,-0.044
-w_deo_minus_w_oxy,-0.69
-tau,2.9
+R1_plas,0.41,1/s,
+R1_ery_0,0.94,1/s,
+r1_prime_dHB,0.17,1/s,
+R2_plas,1.95,1/s,
+R2_dia_plus_R2_oxy,4.9,1/s,
+R2_deoxy_minus_R2_oxy,-2,1/s,
+w_dia_plus_w_oxy,-0.044,ppm,requires conversion in the calculator to rads/s
+w_deo_minus_w_oxy,-0.69,ppm,requires conversion in the calculator to rads/s
+tau,2.9,ms,requires conversion in the calculator to s
