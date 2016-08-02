@@ -31,7 +31,6 @@ from PyQt4 import QtGui, QtCore
 import numpy as np
 import csv
 from inspect import getsourcefile
-from pprint import pprint
 from functools import wraps
 
 class Bunch(object):
@@ -233,10 +232,10 @@ class MainWindow(QtGui.QWidget):
         else:
             raise ValueError('Invalid input type')
             
-def text_to_num(*values):
+def text_to_num(*n):
     # todo: catch exceptions and display warning message if value out of range
     converted_vals = []
-    for val in values:
+    for val in n:
         converted_vals.append(float(val))
         
     return converted_vals

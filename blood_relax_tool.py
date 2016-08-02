@@ -180,6 +180,8 @@ class MainWindow(QtGui.QWidget):
         self.combo_relax.addItems(['T1', 'T2'])
         self.combo_relax.setCurrentIndex(0)
         
+        self.roi_area_label = QtGui.QLabel('ROI Area: 0.00 (pixels) / 0.00 (mm^2)')
+        
         self.plot_im = ROISelectPlot(self)
         self.color_plot_im = ColourROISelectPlot(self)
         self.plot_graph = T2CurvePlot(self)
@@ -219,6 +221,9 @@ class MainWindow(QtGui.QWidget):
         self.vmin_window_slider.setValue(5)
         self.vmax_window_slider = QtGui.QSlider(orientation=QtCore.Qt.Horizontal, minimum=0, maximum=100)
         self.vmax_window_slider.setValue(95)
+        
+        layout_ROI_calc = QtGui.QHBoxLayout()
+        layout_ROI_calc.addWidget(self.roi_area_label)
         layout_slider1 = QtGui.QHBoxLayout()
         layout_slider1.addWidget(QtGui.QLabel('Window Min:'))
         layout_slider1.addSpacing(3)
@@ -231,6 +236,7 @@ class MainWindow(QtGui.QWidget):
         layout_main = QtGui.QVBoxLayout()
         layout_main.addLayout(layout_top)
         layout_main.addLayout(layout_mid)
+        layout_main.addLayout(layout_ROI_calc)
         layout_main.addLayout(layout_slider1)
         layout_main.addLayout(layout_slider2)
         self.setLayout(layout_main)
@@ -277,6 +283,7 @@ class MainWindow(QtGui.QWidget):
         self.button_image_last.setEnabled(enable)
         self.button_image_fwd.setEnabled(enable)
         self.button_image_bwd.setEnabled(enable)
+        self.button_exclude_slice.setEnabled(enable)
         self.combo_roi_style.setEnabled(enable)
         self.combo_relax.setEnabled(enable)
         self.combo_roi_scope.setEnabled(enable)
@@ -383,6 +390,16 @@ class MainWindow(QtGui.QWidget):
                     self.image_ROIs = to_load['ROIs']
                     self.included_slices = to_load['included_slices']
     
+    def calc_ROI_area(self):
+        indicies =  self.image_ROIs[self.image_filename].get_indices()
+        pixel_count = len(indicies[0])
+        row_spacing, col_spacing = self.image_pixel_spacing
+        area_mm2 = pixel_count * row_spacing * col_spacing  
+        
+        roi_area_str = 'ROI Area: {} (pixels) / {} (mm^2)'.format(pixel_count, area_mm2)
+        
+        self.roi_area_label.setText(roi_area_str)
+    
     @QTSlotExceptionRationalizer("bool")
     def grey_roi_complete_callback(self):
         roi_scope = self.get_roi_scope()
@@ -408,7 +425,7 @@ class MainWindow(QtGui.QWidget):
         else:
             self.image_ROIs[self.image_filename] = self.color_activeROI
         # save ROI files
-        self.save_analysis()
+        self.save_analysis() 
         
         self.clear_roi()
         self.load_roi()
@@ -448,7 +465,9 @@ class MainWindow(QtGui.QWidget):
             self.clear_roi()
             self.directory = out
             self.roi_path = os.path.join(self.directory, '.ROIs')
-            self.images, self.image_attributes, self.dicom_list = blood_tools.read_dicoms(out, ['InversionTime'])
+            self.images, self.image_attributes, self.dicom_list = blood_tools.read_dicoms(out, ['InversionTime', 'PixelSpacing'])
+            
+            self.image_pixel_spacing = self.image_attributes[0]['PixelSpacing']    
             # initiate included slices to be all True
             self.included_slices = [True for _ in range(len(self.images))]            
             
@@ -487,6 +506,7 @@ class MainWindow(QtGui.QWidget):
             self.color_activeROI = self.image_ROIs[self.image_filename]
             self.grey_roi_patch = self.grey_activeROI.draw(self.plot_im.axes, self.plot_im.figure, 'red')
             self.color_roi_patch = self.color_activeROI.draw(self.color_plot_im.axes, self.color_plot_im.figure, 'black')
+            self.calc_ROI_area()
     
     @QTSlotExceptionRationalizer("bool")
     def start_roi(self):
