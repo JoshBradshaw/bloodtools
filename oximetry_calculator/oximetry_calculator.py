@@ -35,7 +35,7 @@ from pprint import pprint
 from functools import wraps
 
 class Bunch(object):
-    """""""
+    """" """
     def __init__(self, adict):
         self.__dict__.update(adict)
 
@@ -137,7 +137,7 @@ class MainWindow(QtGui.QWidget):
         layout_main.addWidget(self.case_type_selector, 9, 2)
         
         layout_main.addWidget(self.button_solve, 10,1,1,4)
-        layout_main.addWidget(QtGui.QLabel("Created by Josh Bradshaw, using Sharon Portney's manuscript.\nCite: \nMIT Licensed"), 11, 1, 1, 4)
+        layout_main.addWidget(QtGui.QLabel("Created by Josh Bradshaw, using Sharon Portney's manuscript.\nCite: [INSERT MANUSCRIPT CITATION HERE] \nMIT Licensed"), 11, 1, 1, 4)
         
         layout_main.addWidget(QtGui.QLabel('OUTPUTS'), 1, 3, 1, 2)
         layout_main.addWidget(QtGui.QLabel('sO2 (decimal)'), 2, 3)
@@ -148,6 +148,7 @@ class MainWindow(QtGui.QWidget):
         self.setLayout(layout_main)
         self.button_solve.pressed.connect(self.solve)
         self.input_type_selector.currentIndexChanged.connect(self.input_type_changed)
+        
     
     @QTSlotExceptionRationalizer("bool")
     def solve(self):
@@ -172,8 +173,8 @@ class MainWindow(QtGui.QWidget):
             # ms to s conversion            
             tau_180 = tau_180 / 1000
             Hct_vals, SO2_vals = Hct_sO2_from_T1_T2(model_params, t1, t2, tau_180)
-            hct_output_str = " | ".join('{:.3f}'.format(val) for val in Hct_vals)         
-            sO2_output_str = " | ".join('{:.3f}'.format(val) for val in SO2_vals)
+            hct_output_str = " | ".join(complex_to_str(val) for val in Hct_vals)         
+            sO2_output_str = " | ".join(complex_to_str(val) for val in SO2_vals)
             self.Hct_output.setText(hct_output_str)
             self.sO2_output.setText(sO2_output_str)
         elif input_type == 'T1_sO2':
@@ -187,7 +188,7 @@ class MainWindow(QtGui.QWidget):
             tau_180 = tau_180 / 1000            
             # ms to s conversion
             sO2_vals = sO2_from_T2_Hct(model_params, t2, Hct, tau_180)
-            sO2_output_str = " | ".join('{:.3f}'.format(val) for val in sO2_vals)
+            sO2_output_str = " | ".join(complex_to_str(val) for val in sO2_vals)
             self.sO2_output.setText(sO2_output_str)
         else:
             raise ValueError('Invalid input type')
@@ -294,6 +295,9 @@ def intermediate_constants(parameters, tau_180):
     M2 = -p.r1_prime_dHB
     return (K0, K1, K2, K3, K4, K5, M0, M1, M2)
 
+def complex_to_str(n):
+    return '({0:.3f} {1} {2:.3f}i)'.format(n.real, '+-'[n.imag < 0], abs(n.imag))  
+
 def SO2_from_T1_Hct(parameters, T1, Hct):
     # equation 9
     p = Bunch(parameters)
@@ -308,7 +312,7 @@ def sO2_from_T2_Hct(parameters, T2, Hct, tau_180):
     (K0, K1, K2, K3, K4, K5, M0, M1, M2) = intermediate_constants(parameters, tau_180)    
     
     polynomial_coeff = [K5 *Hct - K5*math.pow(Hct, 2), K3*Hct + K4 * math.pow(Hct, 2), K0 + K1 * Hct + K2 * math.pow(Hct, 2) - R2]
-    sO2_roots = np.real(np.roots(polynomial_coeff))
+    sO2_roots = np.roots(polynomial_coeff)
     return sO2_roots
     
 def Hct_from_T1_sO2(parameters, T1, sO2):
@@ -334,7 +338,7 @@ def Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180):
     # equation 7
     polynomial_coefficients = [A1, B1, C1, D1]    
     roots = np.roots(polynomial_coefficients)
-    Hct_vals = np.real(roots)
+    Hct_vals = roots
     
     SO2_vals = []
     for hct_root in Hct_vals:
@@ -354,10 +358,10 @@ def alt_Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180):
     C2 = K4*(M0 - R1)**2 + K3*(R1*M1 - M0*M1) + K1*(R1*M2 - M0*M2) + 2*K0*M1*M2 - 2*R2*M1*M2
     D2 = K2*(M0 - R1)**2 + K1*(R1*M1 - M0*M1) + K0*M1**2 - R2*M1**2
     
-    # equation 7
+    # equation 8
     polynomial_coefficients = [A2, B2, C2, D2]  
     roots = np.roots(polynomial_coefficients)
-    SO2_vals = np.real(roots)
+    SO2_vals = roots
     
     Hct_vals = []
     for so2_root in SO2_vals:
@@ -365,9 +369,11 @@ def alt_Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180):
     return Hct_vals, SO2_vals
         
 def main():
+    w = 850; h = 400
     app = QtGui.QApplication.instance() or QtGui.QApplication([])
     win = MainWindow()
     win.setWindowTitle('sO2 and Hematocrit Calculator')
+    win.resize(w, h)
     win.show()
     app.exec_()
     return win
