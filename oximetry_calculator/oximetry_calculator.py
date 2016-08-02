@@ -277,7 +277,6 @@ def get_model_parameters(field_strength, vessel_type):
     parameters['w_deo_minus_w_oxy'] = 2 * math.pi * GAMMA * parameters['w_deo_minus_w_oxy'] * f_s
     parameters['tau'] = parameters['tau'] / 1000
     
-    pprint(parameters)
     return parameters
         
 def intermediate_constants(parameters, tau_180):
