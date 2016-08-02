@@ -23,7 +23,6 @@ import numpy as np
 import ROI
 import blood_tools
 import fitting
-from pprint import pprint
 
 def QTSlotExceptionRationalizer(*args):
     """
@@ -146,6 +145,7 @@ class MainWindow(QtGui.QWidget):
         self.grey_roi_patch = None
         self.color_roi_patch = None
         self.controls_enabled(False)
+        self.included_slices = []
 
     @QTSlotExceptionRationalizer("bool")
     def init_gui(self):
@@ -154,6 +154,7 @@ class MainWindow(QtGui.QWidget):
         self.button_load = QtGui.QPushButton(qtawesome.icon('fa.folder-open-o'), '')
         self.button_run = QtGui.QPushButton('Fit Data') 
         self.button_draw_roi = QtGui.QPushButton('Draw ROI') 
+        self.button_exclude_slice = QtGui.QPushButton('Exclude Slice') 
         # first/last prev/next buttons for scrolling through the dicoms
         self.button_image_fwd = QtGui.QPushButton(qtawesome.icon('fa.chevron-right'), '')
         self.button_image_fwd.setObjectName('slice_fwd')
@@ -202,6 +203,7 @@ class MainWindow(QtGui.QWidget):
         layout_top.addWidget(QtGui.QLabel('Apply ROI to:'))
         layout_top.addWidget(self.combo_roi_scope)
         layout_top.addWidget(self.button_draw_roi)
+        layout_top.addWidget(self.button_exclude_slice)
         layout_top.addStretch()
         layout_top.addWidget(self.combo_relax_label)
         layout_top.addWidget(self.combo_relax)
@@ -213,9 +215,9 @@ class MainWindow(QtGui.QWidget):
         layout_mid.addWidget(self.color_plot_im)
         layout_mid.addWidget(self.plot_graph)
         
-        self.vmin_window_slider = QtGui.QSlider(orientation=QtCore.Qt.Horizontal)
+        self.vmin_window_slider = QtGui.QSlider(orientation=QtCore.Qt.Horizontal, minimum=0, maximum=100)
         self.vmin_window_slider.setValue(5)
-        self.vmax_window_slider = QtGui.QSlider(orientation=QtCore.Qt.Horizontal)
+        self.vmax_window_slider = QtGui.QSlider(orientation=QtCore.Qt.Horizontal, minimum=0, maximum=100)
         self.vmax_window_slider.setValue(95)
         layout_slider1 = QtGui.QHBoxLayout()
         layout_slider1.addWidget(QtGui.QLabel('Window Min:'))
@@ -236,12 +238,36 @@ class MainWindow(QtGui.QWidget):
         self.button_load.pressed.connect(self.choose_dir)
         self.button_run.pressed.connect(self.process_data)
         self.button_draw_roi.pressed.connect(self.start_roi)
+        self.button_exclude_slice.pressed.connect(self.exclude_current_slice)
         self.button_image_first.pressed.connect(self.change_image)
         self.button_image_last.pressed.connect(self.change_image)
         self.button_image_fwd.pressed.connect(self.change_image)
         self.button_image_bwd.pressed.connect(self.change_image)
         self.vmin_window_slider.valueChanged.connect(self.set_image_window)
         self.vmax_window_slider.valueChanged.connect(self.set_image_window)
+
+    @QTSlotExceptionRationalizer("bool")
+    def exclude_current_slice(self, *e):
+        if self.included_slices[self.image_index]:
+            self.included_slices[self.image_index] = False
+            self.clear_roi()
+            self.roi_controls_enable(False)
+        else:
+            self.included_slices[self.image_index] = True
+            self.roi_controls_enable(True)
+            self.load_roi()
+            
+    @QTSlotExceptionRationalizer("bool")
+    def roi_controls_enable(self, enable=True):
+        if enable:
+            self.button_exclude_slice.setText('Exclude Slice')
+        else:
+            self.button_exclude_slice.setText('Include Slice')
+            
+        self.combo_roi_style.setEnabled(enable)
+        self.combo_relax.setEnabled(enable)
+        self.combo_roi_scope.setEnabled(enable)
+        self.button_draw_roi.setEnabled(enable)
 
     @QTSlotExceptionRationalizer("bool")
     def controls_enabled(self, enable=True):
@@ -256,7 +282,7 @@ class MainWindow(QtGui.QWidget):
         self.combo_roi_scope.setEnabled(enable)
     
     @QTSlotExceptionRationalizer("bool")
-    def set_image_window(self, e):
+    def set_image_window(self, *e):
         self.vmin = self.vmin_window_slider.value()
         self.vmax = self.vmax_window_slider.value()
         
@@ -328,10 +354,34 @@ class MainWindow(QtGui.QWidget):
             self.clear_roi()
             self.plot_im.mpl_im.set_data(self.images[self.image_index])
             self.color_plot_im.mpl_im.set_data(self.images[self.image_index])
+            self.set_image_window()
+
             self.plot_im.figure.canvas.draw()
             self.color_plot_im.figure.canvas.draw()
             self.load_roi()
             self.slice_label.setText("{}/{}".format(num, demon))
+            
+    def save_analysis(self):
+        """save ROIs and any other essential settings to a .ROIs file"""
+        to_save = {}
+        to_save['ROIs'] = self.image_ROIs
+        to_save['included_slices'] = self.included_slices        
+        
+        with open(self.roi_path, 'w') as f:
+            cPickle.dump(to_save, f)
+            
+    def load_prev_analysis(self):
+        quit_msg = "Would you like to reload your previous ROIs for this series?"
+        reply = QtGui.QMessageBox.question(self, 'Message', 
+                         quit_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+    
+        if reply == QtGui.QMessageBox.Yes:
+            # load image ROIs if possible
+            if os.path.isfile(self.roi_path):
+                with open(self.roi_path, 'r') as f:
+                    to_load = cPickle.load(f)
+                    self.image_ROIs = to_load['ROIs']
+                    self.included_slices = to_load['included_slices']
     
     @QTSlotExceptionRationalizer("bool")
     def grey_roi_complete_callback(self):
@@ -343,9 +393,7 @@ class MainWindow(QtGui.QWidget):
         else:
             self.image_ROIs[self.image_filename] = self.grey_activeROI
             
-        #save ROI files
-        with open(self.roi_path, 'w') as f:
-            cPickle.dump(self.image_ROIs, f)
+        self.save_analysis()
         
         self.clear_roi()
         self.load_roi()
@@ -360,8 +408,7 @@ class MainWindow(QtGui.QWidget):
         else:
             self.image_ROIs[self.image_filename] = self.color_activeROI
         # save ROI files
-        with open(self.roi_path, 'w') as f:
-            cPickle.dump(self.image_ROIs, f)
+        self.save_analysis()
         
         self.clear_roi()
         self.load_roi()
@@ -377,7 +424,7 @@ class MainWindow(QtGui.QWidget):
         return self.combo_relax.currentText()
     
     @QTSlotExceptionRationalizer("bool")
-    def choose_dir(self, event):        
+    def choose_dir(self, *event):        
         """opens a directory choose dialog box, allows the user to select their
         dicom series of interest and loads that series."""  
         self.plot_graph.axes.clear()
@@ -387,12 +434,23 @@ class MainWindow(QtGui.QWidget):
             out = QtGui.QFileDialog.getExistingDirectory(directory=os.path.split(self.directory)[0], caption='MRI Data Directory')
         else:
             out = QtGui.QFileDialog.getExistingDirectory(caption='MRI Data Directory')
+        
         if out:
+            self.image_index = 0
+            self.image_filename = None
+            self.image_ROIs = {}
+            self.image_filename_list = []
+            self.grey_activeROI = None
+            self.color_activeROI = None
+            self.roi_path = None
+            self.images, self.image_attributes = [], []
             self.plot_graph.axes.clear()
             self.clear_roi()
             self.directory = out
             self.roi_path = os.path.join(self.directory, '.ROIs')
             self.images, self.image_attributes, self.dicom_list = blood_tools.read_dicoms(out, ['InversionTime'])
+            # initiate included slices to be all True
+            self.included_slices = [True for _ in range(len(self.images))]            
             
             if not self.images:
                 error = QtGui.QErrorMessage()
@@ -410,11 +468,7 @@ class MainWindow(QtGui.QWidget):
             num, demon = '01', str(len(self.images)).rjust(2, '0')
             self.slice_label.setText("{}/{}".format(num, demon))
             
-            # load image ROIs if possible
-            if os.path.isfile(self.roi_path):
-                with open(self.roi_path, 'r') as f:
-                    self.image_ROIs = {}
-                    self.image_ROIs = cPickle.load(f)
+            self.load_prev_analysis()
             self.load_roi()
         else: # user hit the cancel or x button to leave the dialog
             pass
@@ -422,6 +476,12 @@ class MainWindow(QtGui.QWidget):
     @QTSlotExceptionRationalizer("bool")
     def load_roi(self):
         """if the active image has a previously drawn ROI, this method reloads its"""
+        if not self.included_slices[self.image_index]:
+            self.roi_controls_enable(False)
+            return
+        else:
+            self.roi_controls_enable(True)
+        
         if self.image_filename in self.image_ROIs:
             self.grey_activeROI = self.image_ROIs[self.image_filename]
             self.color_activeROI = self.image_ROIs[self.image_filename]
@@ -450,14 +510,29 @@ class MainWindow(QtGui.QWidget):
             roi_style, 'black', self.color_roi_complete_callback)
         
     @QTSlotExceptionRationalizer("bool")
-    def process_data(self, event):
-
-        if not all(fn in self.image_ROIs for fn in self.image_filename_list):
-            error = QtGui.QErrorMessage()
-            error.showMessage("You must draw an ROI on every slice before you can fit the data. Use the 'All Slices' option if the ROIs are conincident accross the slices")
-            error.exec_()
-            return
-            
+    def process_data(self, *event):
+        # check that user has drawn all of the required ROIs
+        for ii, fn in enumerate(self.image_filename_list):
+            if self.included_slices[ii] and not fn in self.image_ROIs: 
+                error = QtGui.QErrorMessage()
+                error.showMessage("You must draw an ROI on every included slice before you can fit the data. Use the 'All Slices' option if the ROIs are conincident accross the slices")
+                error.exec_()
+                return
+                
+        image_attributes = []
+        images = []
+        roi_list = []
+        dicom_list = []
+        
+        for image_index, include_slice in enumerate(self.included_slices):
+            image_filename = self.image_filename_list[image_index]
+            if include_slice:
+                image_attributes.append(self.image_attributes[image_index])
+                images.append(self.images[image_index])
+                roi_list.append(self.image_ROIs[image_filename])
+                dicom_list.append(self.dicom_list[image_index])
+                
+                
         if not len(self.images) > 0:
             error = QtGui.QErrorMessage()
             error.showMessage('You must load a series of dicom images before fitting the data')
@@ -466,12 +541,11 @@ class MainWindow(QtGui.QWidget):
 
         # todo add error message if images or ROI not loaded
         relaxation_type = self.get_relax_type()      
-        roi_list = [self.image_ROIs[img_fn] for img_fn in self.image_filename_list]
         axes = self.plot_graph.axes
         axes.clear()
 
         if relaxation_type == 'T1':
-            ti, signal = get_T1_decay_signal(self.image_attributes, self.images, roi_list, log_scale=False)
+            ti, signal = get_T1_decay_signal(self.image_attributes, self.images, roi_list, self.included_slices, log_scale=False)
             if not len(ti) or ti[0] == 0:
                 error = QtGui.QErrorMessage()
                 error.showMessage('Failed to find T1 recovery times for this dataset, ensure that this is a T1 series')
@@ -496,7 +570,7 @@ class MainWindow(QtGui.QWidget):
             T1_corr=inversion_recovery['T1'].value*(2*inversion_recovery['aa'].value-1)
             axes.text(0.3, 0.9, "T1 Value: {}ms".format(round(T1_corr)), transform=axes.transAxes)
         elif relaxation_type == 'T2':    
-            x, y = get_T2_decay_signal(self.dicom_list, self.images, roi_list)
+            x, y = get_T2_decay_signal(self.dicom_list, self.images, roi_list, self.included_slices)
 
             if not len(x):
                 error = QtGui.QErrorMessage()
@@ -517,9 +591,10 @@ class MainWindow(QtGui.QWidget):
             axes.text(0.3, 0.9, "T2 Value: {}ms".format(round(t2_value)), transform=axes.transAxes)
         else:
             raise NotImplementedError("This mapping type's fitting algorithm has not been implemented yet") 
+        axes.set_xlim(xmin=0)
         self.plot_graph.figure.canvas.draw()
             
-def get_T2_decay_signal(dicom_list, image_list, roi_list, log_scale=True):
+def get_T2_decay_signal(dicom_list, image_list, roi_list, included_slices, log_scale=True):
     """Simplest case: makes a T2 monoexponential fit given a directory of T2 
     DICOMs and a single ROI mask.
     """
@@ -532,6 +607,10 @@ def get_T2_decay_signal(dicom_list, image_list, roi_list, log_scale=True):
         prep_times = VE11_prep_times
     else:
         prep_times = VE17_prep_times
+        
+    for ii, slice_included in enumerate(included_slices):
+        if not slice_included:
+            prep_times.pop(ii)        
     
     signal = []
     log_signal = []
@@ -544,11 +623,16 @@ def get_T2_decay_signal(dicom_list, image_list, roi_list, log_scale=True):
     else:
         return prep_times, signal
         
-def get_T1_decay_signal(image_attributes, image_list, roi_list, log_scale=True):
+def get_T1_decay_signal(image_attributes, image_list, roi_list, included_slices, log_scale=True):
     """Simplest case: makes a T2 monoexponential fit given a directory of T2 
     DICOMs and a single ROI mask.
     """
-    inversion_times = np.array([att['InversionTime'] for att in image_attributes])   
+    inversion_times = np.array([att['InversionTime'] for att in image_attributes])  
+    
+    for ii, slice_included in enumerate(included_slices):
+        if not slice_included:
+            inversion_times.pop(ii)    
+    
     signal = []
     log_signal = []
     for image, roi in zip(image_list, roi_list):

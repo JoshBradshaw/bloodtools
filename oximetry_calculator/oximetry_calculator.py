@@ -35,8 +35,9 @@ from pprint import pprint
 from functools import wraps
 
 class Bunch(object):
-  def __init__(self, adict):
-    self.__dict__.update(adict)
+    """""""
+    def __init__(self, adict):
+        self.__dict__.update(adict)
 
 def QTSlotExceptionRationalizer(*args):
     """
@@ -150,11 +151,16 @@ class MainWindow(QtGui.QWidget):
     
     @QTSlotExceptionRationalizer("bool")
     def solve(self):
+        """solves the system of equations from sO2 and  Hct described in Sharon
+        Portney's manuscript and updates the output boxes accordingly."""        
+        
         input_type = self.input_type_selector.currentText()
         field_strength = self.base_field_strength_selector.currentText()
         case_type = self.case_type_selector.currentText()
         model_params = get_model_parameters(field_strength, case_type)
         
+        # gets the raw user input from the text boxes, which may be invalid
+        # or have extra whitespace
         t1_text = self.t1_input.text().strip()
         t2_text = self.t2_input.text().strip()
         sO2_text = self.sO2_input.text().strip()
