@@ -102,7 +102,7 @@ class MainWindow(QtGui.QWidget):
         self.Hct_output.setValidator(QtGui.QDoubleValidator())
         
         self.base_field_strength_selector = QtGui.QComboBox()   
-        self.base_field_strength_selector.addItems(['1.5T','3T'])
+        self.base_field_strength_selector.addItems(['1.5T', '1.5T variable tau_180', '3T'])
         self.base_field_strength_selector.setCurrentIndex(0)
         
         self.case_type_selector = QtGui.QComboBox()   
@@ -147,7 +147,7 @@ class MainWindow(QtGui.QWidget):
         self.setLayout(layout_main)
         self.button_solve.pressed.connect(self.solve)
         self.input_type_selector.currentIndexChanged.connect(self.input_type_changed)
-        
+        self.base_field_strength_selector.currentIndexChanged.connect(self.input_type_changed)   
     
     @QTSlotExceptionRationalizer("bool")
     def solve(self):
@@ -157,7 +157,6 @@ class MainWindow(QtGui.QWidget):
         input_type = self.input_type_selector.currentText()
         field_strength = self.base_field_strength_selector.currentText()
         case_type = self.case_type_selector.currentText()
-        model_params = get_model_parameters(field_strength, case_type)
         
         # gets the raw user input from the text boxes, which may be invalid
         # or have extra whitespace
@@ -167,34 +166,63 @@ class MainWindow(QtGui.QWidget):
         Hct_text = self.Hct_input.text().strip()
         tau_180_text = self.tau_180_input.text().strip() 
         
-        if input_type == 'T1_T2':
-            t1, t2, tau_180 = text_to_num(t1_text, t2_text, tau_180_text)
-            # ms to s conversion            
-            tau_180 = tau_180 / 1000
-            Hct_vals, SO2_vals = Hct_sO2_from_T1_T2(model_params, t1, t2, tau_180)
-            hct_output_str = " | ".join(complex_to_str(val) for val in Hct_vals)         
-            sO2_output_str = " | ".join(complex_to_str(val) for val in SO2_vals)
-            self.Hct_output.setText(hct_output_str)
-            self.sO2_output.setText(sO2_output_str)
-        elif input_type == 'T1_sO2':
-            t1, sO2 = text_to_num(t1_text, sO2_text)
-            # ms to s conversion       
-            Hct = Hct_from_T1_sO2(model_params, t1, sO2)
-            hct_output_str = '{}'.format(Hct)
-            self.Hct_output.setText(hct_output_str)
-        elif input_type == 'T2_Hct':
-            t2, Hct, tau_180 = text_to_num(t2_text, Hct_text, tau_180_text)
-            tau_180 = tau_180 / 1000            
-            # ms to s conversion
-            sO2_vals = sO2_from_T2_Hct(model_params, t2, Hct, tau_180)
-            sO2_output_str = " | ".join(complex_to_str(val) for val in sO2_vals)
-            self.sO2_output.setText(sO2_output_str)
+        if field_strength == '1.5T variable tau_180':
+            model_params = get_model_parameters(field_strength, case_type, variable_refocusing=True)              
+            
+            if input_type == 'T1_T2': 
+                t1, t2 = text_to_num(t1_text, t2_text)
+                Hct_vals, SO2_vals = Hct_sO2_from_T1_T2(model_params, t1, t2, variable_refocusing=True)
+                hct_output_str = " | ".join(complex_to_str(val) for val in Hct_vals)         
+                sO2_output_str = " | ".join(complex_to_str(val) for val in SO2_vals)
+                self.Hct_output.setText(hct_output_str)
+                self.sO2_output.setText(sO2_output_str)
+            elif input_type == 'T1_sO2':
+                t1, sO2 = text_to_num(t1_text, sO2_text)
+                # ms to s conversion       
+                Hct = Hct_from_T1_sO2(model_params, t1, sO2, variable_refocusing=True)
+                hct_output_str = '{}'.format(Hct)
+                self.Hct_output.setText(hct_output_str)
+            elif input_type == 'T2_Hct':
+                t2, Hct = text_to_num(t2_text, Hct_text)       
+                # ms to s conversion
+                sO2_vals = sO2_from_T2_Hct(model_params, t2, Hct, variable_refocusing=True)
+                sO2_output_str = " | ".join(complex_to_str(val) for val in sO2_vals)
+                self.sO2_output.setText(sO2_output_str)
+            else:
+                pass
+            
         else:
-            raise ValueError('Invalid input type')
+            model_params = get_model_parameters(field_strength, case_type)            
+            
+            if input_type == 'T1_T2':
+                t1, t2, tau_180 = text_to_num(t1_text, t2_text, tau_180_text)
+                # ms to s conversion            
+                tau_180 = tau_180 / 1000
+                Hct_vals, SO2_vals = Hct_sO2_from_T1_T2(model_params, t1, t2, tau_180)
+                hct_output_str = " | ".join(complex_to_str(val) for val in Hct_vals)         
+                sO2_output_str = " | ".join(complex_to_str(val) for val in SO2_vals)
+                self.Hct_output.setText(hct_output_str)
+                self.sO2_output.setText(sO2_output_str)
+            elif input_type == 'T1_sO2':
+                t1, sO2 = text_to_num(t1_text, sO2_text)
+                # ms to s conversion       
+                Hct = Hct_from_T1_sO2(model_params, t1, sO2)
+                hct_output_str = '{}'.format(Hct)
+                self.Hct_output.setText(hct_output_str)
+            elif input_type == 'T2_Hct':
+                t2, Hct, tau_180 = text_to_num(t2_text, Hct_text, tau_180_text)
+                tau_180 = tau_180 / 1000            
+                # ms to s conversion
+                sO2_vals = sO2_from_T2_Hct(model_params, t2, Hct, tau_180)
+                sO2_output_str = " | ".join(complex_to_str(val) for val in sO2_vals)
+                self.sO2_output.setText(sO2_output_str)
+            else:
+                raise ValueError('Invalid input type')
     
     @QTSlotExceptionRationalizer("bool")
     def input_type_changed(self, *e):
         input_type = self.input_type_selector.currentText()
+        field_strength = self.base_field_strength_selector.currentText()
         
         if input_type == 'T1_T2':
             self.t1_input.setEnabled(True)
@@ -231,6 +259,9 @@ class MainWindow(QtGui.QWidget):
             self.sO2_output.setEnabled(True)
         else:
             raise ValueError('Invalid input type')
+        
+        if field_strength == '1.5T variable tau_180':
+            self.tau_180_input.setEnabled(False)
             
 def text_to_num(*n):
     # todo: catch exceptions and display warning message if value out of range
@@ -240,12 +271,21 @@ def text_to_num(*n):
         
     return converted_vals
             
-def get_model_parameters(field_strength, vessel_type):
-    GAMMA = 42.576 # Hz/Tesla    
-    f_s = float(field_strength.replace('T', ''))
-    expected_fieldnames = ['R1_plas','R1_ery_0','r1_prime_dHB','R2_plas',
-    'R2_dia_plus_R2_oxy','R2_deoxy_minus_R2_oxy','w_dia_plus_w_oxy',
-    'w_deo_minus_w_oxy','tau']        
+def get_model_parameters(field_strength, vessel_type, variable_refocusing=False):
+    GAMMA = 42.576 # Hz/Tesla  
+    
+    if '1.5' in field_strength:
+        f_s = 1.5
+    else:
+        f_s = 3.0
+    
+    if not variable_refocusing:
+        expected_fieldnames = ['R1_plas','R1_ery_0','r1_prime_dHB','R2_plas',
+        'R2_dia_plus_R2_oxy','R2_deoxy_minus_R2_oxy','w_dia_plus_w_oxy',
+        'w_deo_minus_w_oxy','tau']        
+    else:
+        expected_fieldnames = ['R1_plas', 'R1_ery_0', 'r1_prime_dHB', 'a1','a2',
+        'a3', 'b1','b2','c1']
 
     dir_name = os.path.dirname(getsourcefile(lambda:0))
     parameter_fp = os.path.join(dir_name, 'fit_parameters', field_strength, vessel_type.lower() + '.csv')
@@ -270,27 +310,38 @@ def get_model_parameters(field_strength, vessel_type):
             err_msg = 'Parameter: {} is not properly defined in file: {}'.format(exp_par, parameter_fp)
             raise ValueError(err_msg)
     
-    # some not entirely obvious unit conversions
-    # convert wdia + woxy and wdeo - woxy from ppm to rads/sec
-    parameters['w_dia_plus_w_oxy'] = 2 * math.pi * GAMMA * parameters['w_dia_plus_w_oxy'] * f_s
-    parameters['w_deo_minus_w_oxy'] = 2 * math.pi * GAMMA * parameters['w_deo_minus_w_oxy'] * f_s
-    parameters['tau'] = parameters['tau'] / 1000
+    if not variable_refocusing:
+        # some not entirely obvious unit conversions
+        # convert wdia + woxy and wdeo - woxy from ppm to rads/sec
+        parameters['w_dia_plus_w_oxy'] = 2 * math.pi * GAMMA * parameters['w_dia_plus_w_oxy'] * f_s
+        parameters['w_deo_minus_w_oxy'] = 2 * math.pi * GAMMA * parameters['w_deo_minus_w_oxy'] * f_s
+        parameters['tau'] = parameters['tau'] / 1000
     
     return parameters
         
-def intermediate_constants(parameters, tau_180):
-    p = Bunch(parameters)
-    
-    mu = p.tau * (1 - 2*p.tau*math.tanh(tau_180/(2*p.tau))/tau_180)
-    K0 = p.R2_plas
-    K1 = p.R2_dia_plus_R2_oxy + p.R2_deoxy_minus_R2_oxy + mu*math.pow(p.w_dia_plus_w_oxy + p.w_deo_minus_w_oxy, 2)
-    K2 = -mu*math.pow((p.w_dia_plus_w_oxy + p.w_deo_minus_w_oxy), 2)
-    K3 = -p.R2_deoxy_minus_R2_oxy - 2*mu*p.w_deo_minus_w_oxy*(p.w_dia_plus_w_oxy + p.w_deo_minus_w_oxy)
-    K4 = 2*mu*p.w_deo_minus_w_oxy * (p.w_dia_plus_w_oxy + p.w_deo_minus_w_oxy)
-    K5 = mu*math.pow(p.w_deo_minus_w_oxy, 2)
-    M0 = p.R1_plas
-    M1 = p.R1_ery_0 - p.R1_plas + p.r1_prime_dHB
-    M2 = -p.r1_prime_dHB
+def intermediate_constants(parameters, tau_180, variable_refocusing=False):
+    p = Bunch(parameters)    
+    if variable_refocusing:
+        K0 = p.a1
+        K1 = p.a2+p.b1+p.c1
+        K2 = p.a3+p.b2-p.c1
+        K3 = -p.b1-2*p.c1
+        K4 = -p.b2+2*p.c1
+        K5 = p.c1
+        M0 = p.R1_plas
+        M1 = p.R1_ery_0 - p.R1_plas + p.r1_prime_dHB
+        M2 = -p.r1_prime_dHB
+    else:
+        mu = p.tau * (1 - 2*p.tau*math.tanh(tau_180/(2*p.tau))/tau_180)
+        K0 = p.R2_plas
+        K1 = p.R2_dia_plus_R2_oxy + p.R2_deoxy_minus_R2_oxy + mu*math.pow(p.w_dia_plus_w_oxy + p.w_deo_minus_w_oxy, 2)
+        K2 = -mu*math.pow((p.w_dia_plus_w_oxy + p.w_deo_minus_w_oxy), 2)
+        K3 = -p.R2_deoxy_minus_R2_oxy - 2*mu*p.w_deo_minus_w_oxy*(p.w_dia_plus_w_oxy + p.w_deo_minus_w_oxy)
+        K4 = 2*mu*p.w_deo_minus_w_oxy * (p.w_dia_plus_w_oxy + p.w_deo_minus_w_oxy)
+        K5 = mu*math.pow(p.w_deo_minus_w_oxy, 2)
+        M0 = p.R1_plas
+        M1 = p.R1_ery_0 - p.R1_plas + p.r1_prime_dHB
+        M2 = -p.r1_prime_dHB
     return (K0, K1, K2, K3, K4, K5, M0, M1, M2)
 
 def complex_to_str(n):
@@ -304,16 +355,16 @@ def SO2_from_T1_Hct(parameters, T1, Hct):
     sO2 = (R1 - p.R1_plas - Hct * (p.R1_ery_0 - p.R1_plas + p.r1_prime_dHB) ) / (-p.r1_prime_dHB*Hct)
     return sO2
     
-def sO2_from_T2_Hct(parameters, T2, Hct, tau_180):
+def sO2_from_T2_Hct(parameters, T2, Hct, tau_180=0, variable_refocusing=False):
     # equation 11
     R2 = 1000/T2
-    (K0, K1, K2, K3, K4, K5, M0, M1, M2) = intermediate_constants(parameters, tau_180)    
+    (K0, K1, K2, K3, K4, K5, M0, M1, M2) = intermediate_constants(parameters, tau_180, variable_refocusing)    
     
     polynomial_coeff = [K5 *Hct - K5*math.pow(Hct, 2), K3*Hct + K4 * math.pow(Hct, 2), K0 + K1 * Hct + K2 * math.pow(Hct, 2) - R2]
     sO2_roots = np.roots(polynomial_coeff)
     return sO2_roots
     
-def Hct_from_T1_sO2(parameters, T1, sO2):
+def Hct_from_T1_sO2(parameters, T1, sO2, variable_refocusing=False):
     # equation 10
     R1 = 1000/T1
     p = Bunch(parameters)
@@ -321,12 +372,12 @@ def Hct_from_T1_sO2(parameters, T1, sO2):
     Hct = (R1 - p.R1_plas) / (p.R1_ery_0 - p.R1_plas + p.r1_prime_dHB*(1-sO2))
     return Hct
 
-def Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180):
+def Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180=0, variable_refocusing=False):
     # using equations 7 and 9
     R1 = 1000/T1 # 1/s (to be set)
     R2 = 1000/T2 # 1/s (to be set)
 
-    (K0, K1, K2, K3, K4, K5, M0, M1, M2) = intermediate_constants(parameters, tau_180)
+    (K0, K1, K2, K3, K4, K5, M0, M1, M2) = intermediate_constants(parameters, tau_180, variable_refocusing)
     
     A1 = K2*M2**2 - K4*M1*M2 - K5*M1**2
     B1 = K1*M2**2 - K3*M1*M2 + K4*(R1*M2 - M0*M2) + K5*(M1**2 + 2*R1*M1 - 2*M0*M1)
@@ -344,12 +395,12 @@ def Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180):
     
     return Hct_vals, SO2_vals
 
-def alt_Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180):
+def alt_Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180, variable_refocusing=False):
     # using equations 8 and 10
     R1 = 1000/T1 # 1/s (to be set)
     R2 = 1000/T2 # 1/s (to be set)
     
-    (K0, K1, K2, K3, K4, K5, M0, M1, M2) = intermediate_constants(parameters, tau_180)
+    (K0, K1, K2, K3, K4, K5, M0, M1, M2) = intermediate_constants(parameters, tau_180, variable_refocusing)
     
     A2 = K5*(R1*M2 - M0*M2)
     B2 = K5*(R1*M1 - M0*M1 - (M0-R1)**2) + K3*(R1*M2 - M0*M2) + K0*M2**2 - R2*M2**2
@@ -367,7 +418,7 @@ def alt_Hct_sO2_from_T1_T2(parameters, T1, T2, tau_180):
     return Hct_vals, SO2_vals
         
 def main():
-    w = 850; h = 400
+    w = 850; h = 370
     app = QtGui.QApplication.instance() or QtGui.QApplication([])
     win = MainWindow()
     win.setWindowTitle('sO2 and Hematocrit Calculator')

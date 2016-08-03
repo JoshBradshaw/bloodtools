@@ -182,6 +182,8 @@ class MainWindow(QtGui.QWidget):
         
         self.roi_area_label = QtGui.QLabel('ROI Area: 0.00 (pixels) / 0.00 (mm^2)')
         
+        self.uncertainty_checkbox = QtGui.QCheckBox('Fit with uncertainfy (slow)', self)
+        
         self.plot_im = ROISelectPlot(self)
         self.color_plot_im = ColourROISelectPlot(self)
         self.plot_graph = T2CurvePlot(self)
@@ -209,6 +211,7 @@ class MainWindow(QtGui.QWidget):
         layout_top.addStretch()
         layout_top.addWidget(self.combo_relax_label)
         layout_top.addWidget(self.combo_relax)
+        layout_top.addWidget(self.uncertainty_checkbox)
         layout_top.addWidget(self.button_run)
         layout_top.addSpacing(10)
         
@@ -391,12 +394,14 @@ class MainWindow(QtGui.QWidget):
                     self.included_slices = to_load['included_slices']
     
     def calc_ROI_area(self):
+        """using pixel spacing tag in the DICOM header, calculate the area
+        represented by the pixels in the ROI"""
         indicies =  self.image_ROIs[self.image_filename].get_indices()
         pixel_count = len(indicies[0])
         row_spacing, col_spacing = self.image_pixel_spacing
         area_mm2 = pixel_count * row_spacing * col_spacing  
         
-        roi_area_str = 'ROI Area: {} (pixels) / {} (mm^2)'.format(pixel_count, area_mm2)
+        roi_area_str = 'ROI Area: {0} (pixels) / {1:.2f} (mm^2)'.format(pixel_count, area_mm2)
         
         self.roi_area_label.setText(roi_area_str)
     
@@ -528,7 +533,8 @@ class MainWindow(QtGui.QWidget):
         self.color_activeROI = ROI.new_ROI(self.color_plot_im.get_mpl_im(), 
             self.color_plot_im.get_axes(), self.color_plot_im.get_figure(), 
             roi_style, 'black', self.color_roi_complete_callback)
-        
+    
+    
     @QTSlotExceptionRationalizer("bool")
     def process_data(self, *event):
         # check that user has drawn all of the required ROIs
