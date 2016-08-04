@@ -262,6 +262,7 @@ class MainWindow(QtGui.QWidget):
         
         if field_strength == '1.5T variable tau_180':
             self.tau_180_input.setEnabled(False)
+            self.tau_180_input.setText('')
             
 def text_to_num(*n):
     # todo: catch exceptions and display warning message if value out of range

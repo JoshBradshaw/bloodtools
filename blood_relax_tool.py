@@ -23,6 +23,7 @@ import numpy as np
 import ROI
 import blood_tools
 import fitting
+from pprint import pprint
 
 def QTSlotExceptionRationalizer(*args):
     """
@@ -128,7 +129,16 @@ class MainWindow(QtGui.QWidget):
     @QTSlotExceptionRationalizer("bool")
     def __init__(self):
         # draw the interface
+        self.init_image_data()
         self.init_gui()
+        
+        # init controls
+        self.vmin = 5
+        self.vmax = 95
+        self.controls_enabled(False)
+    
+    @QTSlotExceptionRationalizer("bool")
+    def init_image_data(self):
         # initialize these to empty lists so that the slice select display will work before loading images
         self.images, self.image_attributes = [], []    
         # used for keeping track of what slice is displayed
@@ -140,11 +150,8 @@ class MainWindow(QtGui.QWidget):
         self.color_activeROI = None
         self.roi_path = None
         self.directory = ""
-        self.vmin = 5
-        self.vmax = 95
         self.grey_roi_patch = None
         self.color_roi_patch = None
-        self.controls_enabled(False)
         self.included_slices = []
 
     @QTSlotExceptionRationalizer("bool")
@@ -179,10 +186,9 @@ class MainWindow(QtGui.QWidget):
         self.combo_relax = QtGui.QComboBox()
         self.combo_relax.addItems(['T1', 'T2'])
         self.combo_relax.setCurrentIndex(0)
-        
         self.roi_area_label = QtGui.QLabel('ROI Area: 0.00 (pixels) / 0.00 (mm^2)')
         
-        self.uncertainty_checkbox = QtGui.QCheckBox('Fit with uncertainfy (slow)', self)
+        self.uncertainty_checkbox = QtGui.QCheckBox('Fit with uncertainty')        
         
         self.plot_im = ROISelectPlot(self)
         self.color_plot_im = ColourROISelectPlot(self)
@@ -381,13 +387,13 @@ class MainWindow(QtGui.QWidget):
             cPickle.dump(to_save, f)
             
     def load_prev_analysis(self):
-        quit_msg = "Would you like to reload your previous ROIs for this series?"
-        reply = QtGui.QMessageBox.question(self, 'Message', 
-                         quit_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
-    
-        if reply == QtGui.QMessageBox.Yes:
-            # load image ROIs if possible
-            if os.path.isfile(self.roi_path):
+        if os.path.isfile(self.roi_path):
+            quit_msg = "Would you like to reload your previous ROIs for this series?"
+            reply = QtGui.QMessageBox.question(self, 'Message', 
+                             quit_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+        
+            if reply == QtGui.QMessageBox.Yes:
+                # load image ROIs if possible
                 with open(self.roi_path, 'r') as f:
                     to_load = cPickle.load(f)
                     self.image_ROIs = to_load['ROIs']
@@ -458,14 +464,7 @@ class MainWindow(QtGui.QWidget):
             out = QtGui.QFileDialog.getExistingDirectory(caption='MRI Data Directory')
         
         if out:
-            self.image_index = 0
-            self.image_filename = None
-            self.image_ROIs = {}
-            self.image_filename_list = []
-            self.grey_activeROI = None
-            self.color_activeROI = None
-            self.roi_path = None
-            self.images, self.image_attributes = [], []
+            self.init_image_data()
             self.plot_graph.axes.clear()
             self.clear_roi()
             self.directory = out
@@ -534,9 +533,15 @@ class MainWindow(QtGui.QWidget):
             self.color_plot_im.get_axes(), self.color_plot_im.get_figure(), 
             roi_style, 'black', self.color_roi_complete_callback)
     
-    
     @QTSlotExceptionRationalizer("bool")
     def process_data(self, *event):
+        # error handling        
+        if not len(self.images) > 0:
+            error = QtGui.QErrorMessage()
+            error.showMessage('You must load a series of dicom images before fitting the data')
+            error.exec_()
+            return        
+        
         # check that user has drawn all of the required ROIs
         for ii, fn in enumerate(self.image_filename_list):
             if self.included_slices[ii] and not fn in self.image_ROIs: 
@@ -545,82 +550,96 @@ class MainWindow(QtGui.QWidget):
                 error.exec_()
                 return
                 
-        image_attributes = []
-        images = []
-        roi_list = []
-        dicom_list = []
-        
-        for image_index, include_slice in enumerate(self.included_slices):
-            image_filename = self.image_filename_list[image_index]
-            if include_slice:
-                image_attributes.append(self.image_attributes[image_index])
-                images.append(self.images[image_index])
-                roi_list.append(self.image_ROIs[image_filename])
-                dicom_list.append(self.dicom_list[image_index])
-                
-                
-        if not len(self.images) > 0:
-            error = QtGui.QErrorMessage()
-            error.showMessage('You must load a series of dicom images before fitting the data')
-            error.exec_()
-            return
-
         # todo add error message if images or ROI not loaded
         relaxation_type = self.get_relax_type()      
         axes = self.plot_graph.axes
         axes.clear()
 
         if relaxation_type == 'T1':
-            ti, signal = get_T1_decay_signal(self.image_attributes, self.images, roi_list, self.included_slices, log_scale=False)
-            if not len(ti) or ti[0] == 0:
-                error = QtGui.QErrorMessage()
-                error.showMessage('Failed to find T1 recovery times for this dataset, ensure that this is a T1 series')
-                error.exec_()
-                return
+            roi_list = [self.image_ROIs[img_fn] for img_fn in self.image_filename_list]            
             
-            axes.plot(ti, signal, 'ro')
-            axes.set_xlabel('inversion time (ms)')
-            axes.set_ylabel('signal intensity')
-            
-            inversion_recovery = fitting.model('abs(M0*(1-2*aa*exp(-x/T1)))', {'M0':signal.max(),'aa':1,'T1':1000}) 
-            #Initial T1 guess based on null time    
-            T1_guess=-ti[np.where(signal==signal.min())]/np.log(0.5) 
-            if(np.size(T1_guess)>1):
-                inversion_recovery['T1']=T1_guess[0]
-            else:
-                inversion_recovery['T1']=T1_guess  
-                
-            inversion_recovery.fit(ti, signal)
-            fix_x_points=np.arange(0,20000,1)
-            axes.plot(fix_x_points,inversion_recovery(fix_x_points), 'r-')          
-            T1_corr=inversion_recovery['T1'].value*(2*inversion_recovery['aa'].value-1)
-            axes.text(0.3, 0.9, "T1 Value: {}ms".format(round(T1_corr)), transform=axes.transAxes)
+            TIs = get_T1_prep_times(self.image_attributes, self.included_slices)
+            T1s, T1_errs = bootstrap_T1_T2_fitting('T1', self.images, TIs, roi_list, self.included_slices, N=1000)
         elif relaxation_type == 'T2':    
-            x, y = get_T2_decay_signal(self.dicom_list, self.images, roi_list, self.included_slices)
-
-            if not len(x):
-                error = QtGui.QErrorMessage()
-                error.showMessage('Failed to find T2 recovery times for this dataset, ensure that this is a T2 series')
-                error.exec_()
-                return            
-            
-            axes.plot(x, y, 'ro')
-            axes.set_xlabel('TE time (ms)')
-            axes.set_ylabel('log(signal intensity)')
-                        
-            first_coeff, zeroth_coeff = np.polyfit(x, y, 1)
-            start, stop = x[0], x[-1]
-            fit_x_points = np.linspace(start, stop, 1000)
-            fit_y_points = [first_coeff * x_ + zeroth_coeff for x_ in fit_x_points]
-            axes.plot(fit_x_points, fit_y_points, 'b-')
-            t2_value = -1/first_coeff
-            axes.text(0.3, 0.9, "T2 Value: {}ms".format(round(t2_value)), transform=axes.transAxes)
+            pass
         else:
             raise NotImplementedError("This mapping type's fitting algorithm has not been implemented yet") 
+        
+        # always start the time axis at zero
         axes.set_xlim(xmin=0)
         self.plot_graph.figure.canvas.draw()
+    
+def bootstrap_T1_T2_fitting(fit_type, images, TIs, rois, included_slices, N=1000):    
+    """Given a folder of images will process IR data and return
+    fitted T1 values and associated uncertainties.  Uncertainties 
+    are obtained by bootstrapping pixels within each ROI"""
+    T1s=[]
+    T1bs=[]
+    T1_errs=[]
+    
+    signal, serr_signal = get_signal_in_ROI(images, roi_list, included_slices)
+    
+    fit = IR_fit(TIs, sig, serr_signal) 
+    T1s.append(fit['T1'].value)
+    print T1s
+           
+    if N>0:  
+        for nn in np.arange(N):
+            for mm, roi in enumerate(rois):
+                npix = len(roi.get_indices()[0])
+                pixels = roi.get_indices()
+                ind = np.random.randint(npix,size=npix)
+                sig[mm] = images[mm][pixels[0][ind],pixels[1][ind]].mean()                
+            fit = IR_fit(TIs, sig) 
+            T1bs.append(fit['T1'].value)
             
-def get_T2_decay_signal(dicom_list, image_list, roi_list, included_slices, log_scale=True):
+        T1_errs.append(np.std(T1bs))
+        print T1_errs
+    return T1s, T1_errs
+    
+def IR_fit(ti,signal,serr_signal=[]):
+    """Fit inversion recovery data"""
+    if serr_signal==[]:
+        serr_signal=np.ones_like(signal) 
+    inversion_recovery=fitting.model('abs(M0*(1-2*aa*exp(-x/T1)))',
+                                     {'M0':signal.max(),'aa':1,'T1':1000})                                 
+    #Initial T1 guess based on null time    
+    T1_guess=-ti[np.where(signal==signal.min())]/np.log(0.5) 
+    if(np.size(T1_guess)>1):
+        inversion_recovery['T1']=T1_guess[0]
+    else:
+        inversion_recovery['T1']=T1_guess                                
+    inversion_recovery.fit(np.array(ti),signal,serr_signal)  
+
+    return inversion_recovery
+    
+def SE_fit_new(te, signal, serr_signal):
+    """Fit spin echo data.  Will not include points with intensity < noise_factor*mean_noise in the fit"""
+     
+    spin_echo = fitting.model('M0*exp(-x/T2)',{'M0':signal.max(),'T2':100})
+    spin_echo.fitpars['method']='leastsq'    
+    #print mean_noise
+    temp=np.where(signal<noise_factor*mean_noise)[0]
+    if temp.size:
+        stop_index=temp[0]
+    else:
+        stop_index=len(signal)
+    print stop_index
+    
+    spin_echo.fit(te[0:stop_index],signal[0:stop_index],serr_signal[0:stop_index])         
+
+    return spin_echo
+        
+def get_signal_in_ROI(image_list, roi_list, included_slices):
+    signal = []
+    serr_signal = []
+    for image, roi, slice_included in zip(image_list, roi_list, included_slices):
+        if slice_included:        
+            signal.append(blood_tools.calc_ROI_mean(roi, image))
+            serr_signal.append(image[roi.get_indicies()].std())
+    return signal, serr_signal
+            
+def get_T2_prep_times(dicom_list, included_slices):
     """Simplest case: makes a T2 monoexponential fit given a directory of T2 
     DICOMs and a single ROI mask.
     """
@@ -633,23 +652,19 @@ def get_T2_decay_signal(dicom_list, image_list, roi_list, included_slices, log_s
         prep_times = VE11_prep_times
     else:
         prep_times = VE17_prep_times
+    
+    if not len(prep_times):
+        error = QtGui.QErrorMessage()
+        error.showMessage('Failed to find T2 recovery times for this dataset, ensure that this is a T2 series')
+        error.exec_()
+        return   
         
     for ii, slice_included in enumerate(included_slices):
         if not slice_included:
             prep_times.pop(ii)        
-    
-    signal = []
-    log_signal = []
-    for image, roi in zip(image_list, roi_list):
-        mean_signal_magnitude_over_ROI = blood_tools.calc_ROI_mean(roi, image)
-        signal.append(mean_signal_magnitude_over_ROI)
-        log_signal.append(math.log(mean_signal_magnitude_over_ROI))
-    if log_scale:
-        return prep_times, log_signal
-    else:
-        return prep_times, signal
+    return prep_times
         
-def get_T1_decay_signal(image_attributes, image_list, roi_list, included_slices, log_scale=True):
+def get_T1_prep_times(image_attributes, included_slices):
     """Simplest case: makes a T2 monoexponential fit given a directory of T2 
     DICOMs and a single ROI mask.
     """
@@ -657,19 +672,14 @@ def get_T1_decay_signal(image_attributes, image_list, roi_list, included_slices,
     
     for ii, slice_included in enumerate(included_slices):
         if not slice_included:
-            inversion_times.pop(ii)    
+            inversion_times.pop(ii)  
     
-    signal = []
-    log_signal = []
-    for image, roi in zip(image_list, roi_list):
-        mean_signal_magnitude_over_ROI = blood_tools.calc_ROI_mean(roi, image)
-        signal.append(mean_signal_magnitude_over_ROI)
-        log_signal.append(math.log(mean_signal_magnitude_over_ROI))
-    
-    if log_scale:
-        return inversion_times, np.array(log_signal)
-    else:
-        return inversion_times, np.array(signal)
+    if not len(inversion_times) or inversion_times[0] == 0:
+        error = QtGui.QErrorMessage()
+        error.showMessage('Failed to find T1 recovery times for this dataset, ensure that this is a T1 series')
+        error.exec_()
+        return
+    return inversion_times
 
 def main():
     app = QtGui.QApplication.instance() or QtGui.QApplication([])
