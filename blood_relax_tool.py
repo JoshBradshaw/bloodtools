@@ -23,7 +23,6 @@ import numpy as np
 import ROI
 import blood_tools
 import fitting
-from pprint import pprint
 
 def QTSlotExceptionRationalizer(*args):
     """
@@ -186,9 +185,7 @@ class MainWindow(QtGui.QWidget):
         self.combo_relax = QtGui.QComboBox()
         self.combo_relax.addItems(['T1', 'T2'])
         self.combo_relax.setCurrentIndex(0)
-        self.roi_area_label = QtGui.QLabel('ROI Area: 0.00 (pixels) / 0.00 (mm^2)')
-        
-        self.uncertainty_checkbox = QtGui.QCheckBox('Fit with uncertainty')        
+        self.roi_area_label = QtGui.QLabel('ROI Area: 0 (pixels) / 0.00 (mm^2)')     
         
         self.plot_im = ROISelectPlot(self)
         self.color_plot_im = ColourROISelectPlot(self)
@@ -217,7 +214,6 @@ class MainWindow(QtGui.QWidget):
         layout_top.addStretch()
         layout_top.addWidget(self.combo_relax_label)
         layout_top.addWidget(self.combo_relax)
-        layout_top.addWidget(self.uncertainty_checkbox)
         layout_top.addWidget(self.button_run)
         layout_top.addSpacing(10)
         
@@ -572,14 +568,21 @@ class MainWindow(QtGui.QWidget):
 def bootstrap_T1_T2_fitting(fit_type, images, TIs, rois, included_slices, N=1000):    
     """Given a folder of images will process IR data and return
     fitted T1 values and associated uncertainties.  Uncertainties 
-    are obtained by bootstrapping pixels within each ROI"""
+    are obtained by bootstrapping pixels within each ROI
+    
+    !!! Clean up included slices behaviour for this fitting method !!!    
+    """
     T1s=[]
     T1bs=[]
     T1_errs=[]
     
     signal, serr_signal = get_signal_in_ROI(images, roi_list, included_slices)
+        
+    if fit_type == 'T1':
+        fit = IR_fit(TIs, signal, serr_signal) 
+    else:
+        fit = SE_fit_new(T1s, signal, serr_signal)
     
-    fit = IR_fit(TIs, sig, serr_signal) 
     T1s.append(fit['T1'].value)
     print T1s
            
@@ -590,7 +593,10 @@ def bootstrap_T1_T2_fitting(fit_type, images, TIs, rois, included_slices, N=1000
                 pixels = roi.get_indices()
                 ind = np.random.randint(npix,size=npix)
                 sig[mm] = images[mm][pixels[0][ind],pixels[1][ind]].mean()                
-            fit = IR_fit(TIs, sig) 
+                if fit_type == 'T1':
+                    fit = IR_fit(TIs, signal, serr_signal) 
+                else:
+                    fit = SE_fit_new(T1s, signal, serr_signal) 
             T1bs.append(fit['T1'].value)
             
         T1_errs.append(np.std(T1bs))
@@ -614,19 +620,18 @@ def IR_fit(ti,signal,serr_signal=[]):
     return inversion_recovery
     
 def SE_fit_new(te, signal, serr_signal):
-    """Fit spin echo data.  Will not include points with intensity < noise_factor*mean_noise in the fit"""
+    """ Deliberately not doing any noise floor fitting, the clinical scan
+    will never hit noise floor for blood T2s.
+    
+    To do noise floor fitting: use SE_fit_new in blood_tools.py    
+    """
      
     spin_echo = fitting.model('M0*exp(-x/T2)',{'M0':signal.max(),'T2':100})
-    spin_echo.fitpars['method']='leastsq'    
-    #print mean_noise
-    temp=np.where(signal<noise_factor*mean_noise)[0]
-    if temp.size:
-        stop_index=temp[0]
-    else:
-        stop_index=len(signal)
-    print stop_index
-    
-    spin_echo.fit(te[0:stop_index],signal[0:stop_index],serr_signal[0:stop_index])         
+    spin_echo.fitpars['method'] = 'leastsq'
+    spin_echo.fit(te, signal, serr_signal) 
+
+    best_fit_pars=[p.value for p in model.pars]
+    print best_fit_pars        
 
     return spin_echo
         
@@ -684,6 +689,7 @@ def get_T1_prep_times(image_attributes, included_slices):
 def main():
     app = QtGui.QApplication.instance() or QtGui.QApplication([])
     win = MainWindow()
+    win.setWindowTitle('T1 and T2 Fitting Tool - by Josh Bradshaw & Sharon Portnoy - The Hospital for Sick Children')
     win.show()
     app.exec_()
     return win
